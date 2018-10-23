@@ -24,6 +24,7 @@ def get_date():
     date_full = datetime.datetime.now()
     return '{}{:02}{:02}'.format(date_full.year, date_full.month, date_full.day)
 date = get_date()
+
 #   Make result directories.
 method = '_source_shift/'
 result_dir_path = 'result/'+date+method
@@ -96,6 +97,9 @@ def get_dict_imp_prod_sort_cat(df_imp, df_imp_full, df_tY, imp_cum_lim):
         bool_add = True
         for tup_prod_abs_id, tup_prod_abs in enumerate(list_imp_sort):
             (prod, imp_abs) = tup_prod_abs
+#            (prod_long, imp_abs) = tup_prod_abs
+#            prod = dict_prod_long_short[prod_long]
+
             imp_rel = imp_abs/dict_imp_prod_sum[imp_cat]
             imp_cum = imp_cum + imp_rel
             if imp_cum < imp_cum_lim:
@@ -158,12 +162,14 @@ def get_dict_imp(dict_df_imp):
             dict_imp[imp_cat] = {}
             for tup_prod_cntr in dict_df[imp_cat]:
                 cntr, prod = tup_prod_cntr
+#                cntr, prod_long = tup_prod_cntr
+#                prod = dict_prod_long_short[prod_long]
                 if prod not in dict_imp[imp_cat]:
                     dict_imp[imp_cat][prod] = {}
                 dict_imp[imp_cat][prod][cntr] = dict_df[imp_cat][tup_prod_cntr]
     return dict_imp
 
-def get_dict_imp_prod_sort(imp_cum_lim = 1.1):
+def get_dict_imp_prod_sort(imp_cum_lim):
     dict_imp_prod_sort = {}
     for cat in dict_df_imp:
         dict_imp_prod_sort_cat = (
@@ -178,7 +184,7 @@ def get_dict_imp_prod_sort(imp_cum_lim = 1.1):
 
 
 def get_dict_imp_prod_sort_cons():
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort()
+    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
     list_prod_full = []
     for imp_cat in dict_imp_prod_sort_full:
         list_prod_imp_cat = list(dict_imp_prod_sort_full[imp_cat].keys())
@@ -208,19 +214,28 @@ def get_dict_imp_sel_reg(dict_imp_sel):
             for imp_cat_eff in dict_imp_sel[cntr_fd][imp_cat_sel]:
                 if imp_cat_eff not in dict_imp_sel_reg[imp_cat_sel]:
                     dict_imp_sel_reg[imp_cat_sel][imp_cat_eff] = {}
-                for prod_long in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
-                    prod_short = dict_prod_long_short[prod_long]
-                    if prod_short not in (
+#                for prod_long in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
+#                    prod_short = dict_prod_long_short[prod_long]
+#                    if prod_short not in (
+#                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]):
+#                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
+#                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long]:
+#                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long][cntr]
+#                        if cntr_fd is not cntr:
+#                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] += imp_abs
+                for prod in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
+                    if prod not in (
                             dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]):
-                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
-                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long]:
-                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long][cntr]
+                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] = 0
+                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod]:
+                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod][cntr]
                         if cntr_fd is not cntr:
-                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] += imp_abs
+                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] += imp_abs
+
     return dict_imp_sel_reg
 
 def get_dict_imp_sel_reg_cons():
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort()
+    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
 
     dict_imp_sel_cons = {}
     for cntr_fd in list_reg_fd:
@@ -310,6 +325,7 @@ def get_dict_imp_sel():
 
 
 def plot_priority_setting_individual_one_plot():
+    print('priority setting')
     dict_xlim = {}
     dict_imp_sel = get_dict_imp_sel()
 
@@ -325,6 +341,7 @@ def plot_priority_setting_individual_one_plot():
             plot_loc = 140+plot_id
             ax = fig.add_subplot(plot_loc)
             df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_eff], index=['import'])
+            df.rename(columns=dict_prod_long_short, inplace=True)
             df.T.plot.barh(stacked=True,
                            ax=ax,
                            legend=False,
@@ -344,6 +361,7 @@ def plot_priority_setting_individual_one_plot():
     dict_prod_order = {}
     for imp_cat_sel in dict_imp_sel_reg:
         df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel], index=['import'])
+        df.rename(columns=dict_prod_long_short, inplace=True)
         df_sum_sort = df.sum().sort_values()
         prod_order = list(df_sum_sort.index)
         dict_prod_order[imp_cat_sel] = prod_order
@@ -366,6 +384,7 @@ def plot_priority_setting_individual_one_plot():
         unit = dict_imp_cat_unit[imp_cat_sel[-1]]
         ax.set_xlabel('{} [{}]'.format(fp, unit), fontsize=font_size)
         df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel], index=['import'])
+        df.rename(columns=dict_prod_long_short, inplace=True)
         df = df.reindex(prod_order, axis=1)
         column_name_dummy = ''
         prod_order_dummy = prod_order
@@ -422,9 +441,10 @@ def plot_priority_setting_individual_one_plot():
 
 
 def plot_improv():
-
+    print('plot_improv')
     plt.close('all')
     fig = plt.figure(figsize=cm2inch((16, 1+13*0.4)))
+    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
 
     dict_xlim_improv = {}
     for imp_cat_sel_id, imp_cat_sel in enumerate(dict_imp_new_reg):
@@ -433,10 +453,12 @@ def plot_improv():
             plot_id = imp_cat_eff_id+1
             plot_loc = 140+plot_id
             ax = fig.add_subplot(plot_loc)
-            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+#            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
             df_new = pd.DataFrame(
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
             df = df_new-df_old
+            df.rename(columns = dict_prod_long_short, inplace=True)
             df = df.reindex(prod_order_cons, axis=1)
             df_color = df.loc['import'] <= 0
             df.T.plot.barh(stacked=True,
@@ -486,10 +508,13 @@ def plot_improv():
             unit = dict_imp_cat_unit[imp_cat_eff[-1]]
             ax.set_xlabel(unit, fontsize=font_size)
             ax.set_xlim(dict_xlim_improv[imp_cat_eff])
-            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+#            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
+
             df_new = pd.DataFrame(
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
             df = df_new-df_old
+            df.rename(columns = dict_prod_long_short, inplace=True)
             df = df.reindex(prod_order_cons, axis=1)
             df_color = df.loc['import'] <= 0
             df.T.plot.barh(stacked=True,
@@ -535,6 +560,9 @@ def plot_improv():
 
 
 def plot_improv_agg():
+    print('plot_improv_agg')
+    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
+
     dict_pot_imp_agg = {}
     for imp_cat_sel_id, imp_cat_sel in enumerate(dict_imp_new_reg):
         fp_sel = dict_imp_cat_fp[imp_cat_sel]
@@ -545,7 +573,8 @@ def plot_improv_agg():
             if fp_eff not in dict_pot_imp_agg:
                 dict_pot_imp_agg[fp_eff] = {}
             if 'Ante' not in dict_pot_imp_agg[fp_eff]:
-                df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+#                df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
+                df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
                 df_old_sum = df_old.sum(axis=1)
                 dict_pot_imp_agg[fp_eff]['Prior'] = float(
                         df_old_sum['import'])
@@ -619,6 +648,7 @@ def plot_improv_agg():
     fig.savefig(png_file_path)
 
 def sourceshift():
+    print('sourceshift')
     x_prod_cntr_min = 0.5
 
     df_cQe = dict_cf['e']
@@ -639,7 +669,7 @@ def sourceshift():
     dict_imp_pME = get_dict_imp(dict_df_imp_pME)
 
 
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort()
+    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
     dict_imp_prod_cntr_sort = get_dict_imp_prod_cntr_sort(dict_imp,
                                                           dict_imp_prod_sort_full,
                                                           df_tY_eu28_fdsum,
@@ -654,6 +684,8 @@ def sourceshift():
     for cntr_fd in dict_tY_eu28_cntr:
         for tup_cntr_prod in dict_tY_eu28_cntr[cntr_fd]:
             cntr, prod = tup_cntr_prod
+#            cntr, prod_long = tup_cntr_prod
+#            prod = dict_prod_long_short[prod_long]
             if prod not in dict_tY_eu28_cntr_import:
                 dict_tY_eu28_cntr_import[prod] = {}
 
@@ -714,6 +746,8 @@ def sourceshift():
     dict_tY_world_ex_prod_cntr = {}
     for tup_cntr_prod in dict_tY_world_ex:
         cntr, prod = tup_cntr_prod
+#        cntr, prod_long = tup_cntr_prod
+#        prod = dict_prod_long_short[prod_long]
         if prod not in dict_tY_world_ex_prod_cntr:
             dict_tY_world_ex_prod_cntr[prod] = {}
         dict_tY_world_ex_prod_cntr[prod][cntr] = dict_tY_world_ex[tup_cntr_prod]
@@ -825,11 +859,11 @@ def sourceshift():
             unit = imp_cat[-1]
             ax.set_ylabel('{}/M€'.format(unit), fontsize=font_size)
             ax.set_xlabel('M€', fontsize=font_size)
-            fp = dict_imp_cat_fp[imp_cat]
-            fp_lower = fp.lower()
-            prod_short = dict_prod_long_short[prod]
-            prod_short_lower = prod_short.lower()
-            prod_short_lower_strip = prod_short_lower.strip()
+#            fp = dict_imp_cat_fp[imp_cat]
+#            fp_lower = fp.lower()
+#            prod_short = dict_prod_long_short[prod]
+#            prod_short_lower = prod_short.lower()
+#            prod_short_lower_strip = prod_short_lower.strip()
             fig.tight_layout(pad=0)
             dict_lim[imp_cat][prod] = {}
             dict_lim[imp_cat][prod]['x'] = (0, x_max)
@@ -1056,9 +1090,14 @@ def sourceshift():
             prod_short_lower_strip = prod_short_lower.strip()
             prod_short_lower_strip = prod_short_lower_strip.replace(':','')
             prod_short_lower_strip_us = prod_short_lower_strip.replace(' ','_')
+#            prod_lower = prod.lower()
+#            prod_lower_strip = prod_lower.strip()
+#            prod_lower_strip = prod_lower_strip.replace(':','')
+#            prod_lower_strip_us = prod_lower_strip.replace(' ','_')
             fp = dict_imp_cat_fp[imp_cat]
             fp_lower = fp.lower()
             fp_prod = fp_lower+'_'+prod_short_lower_strip_us
+#            fp_prod = fp_lower+'_'+prod_lower_strip_us
             fig.tight_layout(pad=0.1)
 
             shift_dir_path = result_dir_path+shift_dir_name
@@ -1075,6 +1114,7 @@ def sourceshift():
     return dict_y_new
 #   Calculate new impact
 def calc_new_fp():
+    print('calc_new_fp')
     dict_df_tY_import_new = {}
     for imp_cat_id, imp_cat in enumerate(dict_y_new):
         dict_df_tY_import_new[imp_cat] = {}
@@ -1113,12 +1153,19 @@ def calc_new_fp():
             if imp_cat_eff not in dict_imp_new_reg[imp_cat_sel]:
                 dict_imp_new_reg[imp_cat_sel][imp_cat_eff] = {}
             for prod in dict_imp_new[imp_cat_sel][imp_cat_eff]:
-                prod_short = dict_prod_long_short[prod]
-                if prod_short not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
-                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
+#                prod_short = dict_prod_long_short[prod]
+#                if prod_short not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
+#                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
+#                for cntr in dict_imp_new[imp_cat_sel][imp_cat_eff][prod]:
+#                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] += (
+#                            dict_imp_new[imp_cat_sel][imp_cat_eff][prod][cntr])
+
+                if prod not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
+                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod] = 0
                 for cntr in dict_imp_new[imp_cat_sel][imp_cat_eff][prod]:
-                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] += (
+                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod] += (
                             dict_imp_new[imp_cat_sel][imp_cat_eff][prod][cntr])
+
     return dict_imp_new_reg
 ###############################################################################
 plt.close('all')
@@ -1247,8 +1294,9 @@ for cntr_fd in list_reg_fd:
     # For all countries in EU28, cast dataframes with absolute impact to dict.
     dict_imp_cntr[cntr_fd] = get_dict_imp(dict_df_imp_cntr[cntr_fd])
 
-
-dict_imp_sel_reg_cons = get_dict_imp_sel_reg_cons()
+#dict_imp_prod_sort_full = get_dict_imp_prod_sort()
+#dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
+#dict_imp_sel_reg_cons = get_dict_imp_sel_reg_cons()
 
 dict_imp_cat_unit = {}
 dict_imp_cat_unit['kg CO2 eq.'] = r'$Pg\/CO_2\/eq.$'
