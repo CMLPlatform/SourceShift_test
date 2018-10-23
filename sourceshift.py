@@ -69,47 +69,6 @@ def cm2inch(tup_cm):
     return tup_inch
 
 
-def get_reg_fd(reg_fd):
-    if reg_fd == 'EU28':
-        with open(data_path+eu28_file_name) as read_file:
-            csv_file = csv.reader(read_file, delimiter='\t')
-            list_reg_fd = []
-            for row in csv_file:
-                list_reg_fd.append(row[0])
-    else:
-        list_reg_fd = [reg_fd]
-    dict_reg = {}
-    dict_reg[reg_fd] = list_reg_fd
-    return dict_reg
-
-
-def get_dict_imp_prod_sort_cat(df_imp, df_imp_full, df_tY, imp_cum_lim):
-    df_imp_prod = df_imp.sum(axis=1, level=1)
-
-    dict_imp_prod = df_imp_prod.T.to_dict()
-    dict_imp_prod_sum = df_imp.sum(axis=1).to_dict()
-    dict_imp_prod_sort = OrderedDict()
-    for imp_cat in dict_imp_prod:
-        dict_imp_prod_sort[imp_cat] = OrderedDict()
-        list_imp_sort = sorted(dict_imp_prod[imp_cat].items(),
-                               key=operator.itemgetter(1), reverse=True)
-        imp_cum = 0
-        bool_add = True
-        for tup_prod_abs_id, tup_prod_abs in enumerate(list_imp_sort):
-            (prod, imp_abs) = tup_prod_abs
-#            (prod_long, imp_abs) = tup_prod_abs
-#            prod = dict_prod_long_short[prod_long]
-
-            imp_rel = imp_abs/dict_imp_prod_sum[imp_cat]
-            imp_cum = imp_cum + imp_rel
-            if imp_cum < imp_cum_lim:
-                dict_imp_prod_sort[imp_cat][prod] = imp_abs
-            elif bool_add:
-                dict_imp_prod_sort[imp_cat][prod] = imp_abs
-                bool_add = False
-    return dict_imp_prod_sort
-
-
 def get_cf(file_path, df_cQ):
     list_imp = []
     with open(file_path) as read_file:
@@ -130,7 +89,7 @@ def get_dict_cf():
     return dict_cf
 
 
-def get_dict_df_imp(dict_eb, df_tY, dict_cf):
+def get_dict_df_imp(df_tY):
     #   Diagonalize final demand.
     ar_tY = np.diag(df_tY)
     df_tYd = pd.DataFrame(ar_tY, index=df_tY.index, columns=df_tY.index)
@@ -162,152 +121,66 @@ def get_dict_imp(dict_df_imp):
             dict_imp[imp_cat] = {}
             for tup_prod_cntr in dict_df[imp_cat]:
                 cntr, prod = tup_prod_cntr
-#                cntr, prod_long = tup_prod_cntr
-#                prod = dict_prod_long_short[prod_long]
                 if prod not in dict_imp[imp_cat]:
                     dict_imp[imp_cat][prod] = {}
                 dict_imp[imp_cat][prod][cntr] = dict_df[imp_cat][tup_prod_cntr]
     return dict_imp
 
+
 def get_dict_imp_prod_sort(imp_cum_lim):
     dict_imp_prod_sort = {}
     for cat in dict_df_imp:
-        dict_imp_prod_sort_cat = (
-                get_dict_imp_prod_sort_cat(dict_df_imp[cat],
-                                           dict_df_imp_full[cat],
-                                           df_tY_eu28_fdsum,
-                                           imp_cum_lim))
+        df_imp_prod = dict_df_imp[cat].sum(axis=1, level=1)
+
+        dict_imp_prod = df_imp_prod.T.to_dict()
+        dict_imp_prod_sum = dict_df_imp[cat].sum(axis=1).to_dict()
+        dict_imp_prod_sort_cat = OrderedDict()
+        for imp_cat in dict_imp_prod:
+            dict_imp_prod_sort_cat[imp_cat] = OrderedDict()
+            list_imp_sort = sorted(dict_imp_prod[imp_cat].items(),
+                                   key=operator.itemgetter(1), reverse=True)
+            imp_cum = 0
+            bool_add = True
+            for tup_prod_abs_id, tup_prod_abs in enumerate(list_imp_sort):
+                (prod, imp_abs) = tup_prod_abs
+                imp_rel = imp_abs/dict_imp_prod_sum[imp_cat]
+                imp_cum = imp_cum + imp_rel
+                if imp_cum < imp_cum_lim:
+                    dict_imp_prod_sort_cat[imp_cat][prod] = imp_abs
+                elif bool_add:
+                    dict_imp_prod_sort_cat[imp_cat][prod] = imp_abs
+                    bool_add = False
+
+
         for imp_cat in dict_imp_prod_sort_cat:
             dict_imp_prod_sort[imp_cat] = dict_imp_prod_sort_cat[imp_cat]
 
     return dict_imp_prod_sort
 
 
-def get_dict_imp_prod_sort_cons():
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
-    list_prod_full = []
-    for imp_cat in dict_imp_prod_sort_full:
-        list_prod_imp_cat = list(dict_imp_prod_sort_full[imp_cat].keys())
-        for prod in list_prod_imp_cat:
-            if prod not in list_prod_full:
-                list_prod_full.append(prod)
-
-    dict_imp_prod_sort_cons = {}
-    for cat in dict_df_imp:
-        df_imp = dict_df_imp[cat]
-        df_imp_prod = df_imp.sum(axis=1, level=1)
-        dict_imp_prod = df_imp_prod.T.to_dict()
-        for imp_cat in dict_imp_prod:
-            dict_imp_prod_sort_cons[imp_cat] = {}
-            for prod in list_prod_full:
-                imp_abs = dict_imp_prod[imp_cat][prod]
-                dict_imp_prod_sort_cons[imp_cat][prod] = imp_abs
-    return dict_imp_prod_sort_cons
+def set_priority():
+    print('priority setting')
+    dict_xlim = {}
 
 
-def get_dict_imp_sel_reg(dict_imp_sel):
-    dict_imp_sel_reg = {}
-    for cntr_fd in dict_imp_sel:
-        for imp_cat_sel in dict_imp_sel[cntr_fd]:
-            if imp_cat_sel not in dict_imp_sel_reg:
-                dict_imp_sel_reg[imp_cat_sel] = {}
-            for imp_cat_eff in dict_imp_sel[cntr_fd][imp_cat_sel]:
-                if imp_cat_eff not in dict_imp_sel_reg[imp_cat_sel]:
-                    dict_imp_sel_reg[imp_cat_sel][imp_cat_eff] = {}
-#                for prod_long in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
-#                    prod_short = dict_prod_long_short[prod_long]
-#                    if prod_short not in (
-#                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]):
-#                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
-#                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long]:
-#                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod_long][cntr]
-#                        if cntr_fd is not cntr:
-#                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod_short] += imp_abs
-                for prod in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
-                    if prod not in (
-                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]):
-                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] = 0
-                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod]:
-                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod][cntr]
-                        if cntr_fd is not cntr:
-                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] += imp_abs
-
-    return dict_imp_sel_reg
-
-def get_dict_imp_sel_reg_cons():
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
-
-    dict_imp_sel_cons = {}
+    #   Disaggregate impacts by domestic production, imports from in- and exEU28.
+    dict_df_imp_cntr = {}
+    dict_imp_cntr = {}
     for cntr_fd in list_reg_fd:
-        # For all countries in EU28, select highest contributing products..
-        dict_imp_sel_cons[cntr_fd] = {}
-#        for imp_cat_sel in dict_imp_prod_sort_cons:
-        for imp_cat_sel in dict_imp_prod_sort_full:
-            dict_imp_sel_cons[cntr_fd][imp_cat_sel] = {}
-            for imp_cat_eff in dict_imp:
-                dict_imp_sel_cons[cntr_fd][imp_cat_sel][imp_cat_eff] = OrderedDict()
-#                for prod in dict_imp_prod_sort_cons[imp_cat_sel]:
-                for prod in dict_imp_prod_sort_full[imp_cat_sel]:
-                    dict_imp_sel_cons[cntr_fd][imp_cat_sel][imp_cat_eff][prod] = (
-                            dict_imp_cntr[cntr_fd][imp_cat_eff][prod])
+        df_tY_cntr = dict_eb['tY'][cntr_fd].copy()
+        df_tY_cntr.loc[cntr_fd] = 0
+        df_tY_cntr_fdsum = df_tY_cntr.sum(axis=1)
+        # For all countries in EU28, calculate dataframes with absolute impact.
+    #    dict_df_imp_cntr[cntr_fd] = get_dict_df_imp(dict_eb,
+    #                                                df_tY_cntr_fdsum,
+    #                                                dict_cf)
 
-    dict_imp_sel_reg = get_dict_imp_sel_reg(dict_imp_sel_cons)
+        dict_df_imp_cntr[cntr_fd] = get_dict_df_imp(df_tY_cntr_fdsum)
 
-    dict_imp_sel_reg_cons = {}
-    for imp_cat_sel in dict_imp_sel_reg:
-        for imp_cat_eff in dict_imp_sel_reg[imp_cat_sel]:
-            if imp_cat_eff not in dict_imp_sel_reg_cons:
-                dict_imp_sel_reg_cons[imp_cat_eff] = {}
-            for prod in dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]:
-                if prod not in dict_imp_sel_reg_cons[imp_cat_eff]:
-                    dict_imp_sel_reg_cons[imp_cat_eff][prod] = (
-                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod])
-    return dict_imp_sel_reg_cons
+        # For all countries in EU28, cast dataframes with absolute impact to dict.
+        dict_imp_cntr[cntr_fd] = get_dict_imp(dict_df_imp_cntr[cntr_fd])
 
 
-def get_dict_imp_prod_cntr_sort(dict_imp,
-                                dict_imp_prod_sort,
-                                df_tY, dict_imp_pME):
-    dict_tY = df_tY.to_dict()
-    dict_tY_prod_cntr = {}
-    for tup_cntr_prod in dict_tY:
-        cntr, prod = tup_cntr_prod
-        if prod not in dict_tY_prod_cntr:
-            dict_tY_prod_cntr[prod] = {}
-        dict_tY_prod_cntr[prod][cntr] = dict_tY[tup_cntr_prod]
-
-    dict_imp_prod_cntr_sort = {}
-    for imp_cat in dict_imp_prod_sort:
-        dict_imp_prod_cntr_sort[imp_cat] = OrderedDict()
-        dict_imp_pME_prod_cntr = {}
-        for prod in dict_imp_prod_sort[imp_cat]:
-            dict_imp_prod_cntr_sort[imp_cat][prod] = OrderedDict()
-            dict_imp_prod_cntr = dict_imp[imp_cat][prod]
-            dict_imp_pME_prod_cntr[prod] = {}
-            imp_abs_prod = dict_imp_prod_sort[imp_cat][prod]
-
-            for cntr in dict_imp_prod_cntr:
-                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
-                dict_imp_pME_prod_cntr[prod][cntr] = (
-                        dict_imp_pME[imp_cat][prod][cntr])
-            list_imp_pME_prod_cntr_sort = sorted(
-                        dict_imp_pME_prod_cntr[prod].items(),
-                        key=operator.itemgetter(1))
-            imp_cum_prod_cntr = 0
-            for tup_cntr_imp_pME in list_imp_pME_prod_cntr_sort:
-                cntr, imp_pME_prod_cntr = tup_cntr_imp_pME
-                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
-                if imp_abs_prod > 0:
-                    imp_rel_prod_cntr = imp_abs_prod_cntr/imp_abs_prod
-                else:
-                    imp_rel_prod_cntr = 0.0
-                imp_cum_prod_cntr += imp_rel_prod_cntr
-                dict_imp_prod_cntr_sort[imp_cat][prod][cntr] = imp_abs_prod_cntr
-
-    return dict_imp_prod_cntr_sort
-
-
-def get_dict_imp_sel():
     dict_imp_prod_sort = get_dict_imp_prod_sort(0.5)
 
     dict_imp_sel = {}
@@ -321,15 +194,24 @@ def get_dict_imp_sel():
                 for prod in dict_imp_prod_sort[imp_cat_sel]:
                     dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod] = (
                             dict_imp_cntr[cntr_fd][imp_cat_eff][prod])
-    return dict_imp_sel
 
 
-def plot_priority_setting_individual_one_plot():
-    print('priority setting')
-    dict_xlim = {}
-    dict_imp_sel = get_dict_imp_sel()
-
-    dict_imp_sel_reg = get_dict_imp_sel_reg(dict_imp_sel)
+    dict_imp_sel_reg = {}
+    for cntr_fd in dict_imp_sel:
+        for imp_cat_sel in dict_imp_sel[cntr_fd]:
+            if imp_cat_sel not in dict_imp_sel_reg:
+                dict_imp_sel_reg[imp_cat_sel] = {}
+            for imp_cat_eff in dict_imp_sel[cntr_fd][imp_cat_sel]:
+                if imp_cat_eff not in dict_imp_sel_reg[imp_cat_sel]:
+                    dict_imp_sel_reg[imp_cat_sel][imp_cat_eff] = {}
+                for prod in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff]:
+                    if prod not in (
+                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff]):
+                        dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] = 0
+                    for cntr in dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod]:
+                        imp_abs = dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod][cntr]
+                        if cntr_fd is not cntr:
+                            dict_imp_sel_reg[imp_cat_sel][imp_cat_eff][prod] += imp_abs
 
     for imp_cat_sel_id, imp_cat_sel in enumerate(dict_imp_sel_reg):
         fig_y_size = len(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel])
@@ -375,7 +257,6 @@ def plot_priority_setting_individual_one_plot():
     fig = plt.figure(figsize=cm2inch((16, 8)))
     for imp_cat_sel_id, imp_cat_sel in enumerate(dict_imp_sel_reg):
         fig_y_size = len(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel])
-        fp = dict_imp_cat_fp[imp_cat_sel]
         prod_order = dict_prod_order[imp_cat_sel]
         plot_id = imp_cat_sel_id+1
         plot_loc = 220+plot_id
@@ -440,7 +321,17 @@ def plot_priority_setting_individual_one_plot():
     fig.savefig(fig_file_path)
 
 
-def plot_improv():
+def calc_improv():
+    dict_imp_new_reg = calc_new_fp()
+
+    prod_order_cons = []
+    with open(data_path+prod_order_file_name, 'r') as read_file:
+        csv_file = csv.reader(read_file, delimiter='\t')
+        for row in csv_file:
+            prod_order_cons.append(row[0])
+    prod_order_cons.reverse()
+
+
     print('plot_improv')
     plt.close('all')
     fig = plt.figure(figsize=cm2inch((16, 1+13*0.4)))
@@ -453,7 +344,6 @@ def plot_improv():
             plot_id = imp_cat_eff_id+1
             plot_loc = 140+plot_id
             ax = fig.add_subplot(plot_loc)
-#            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
             df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
             df_new = pd.DataFrame(
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
@@ -508,7 +398,6 @@ def plot_improv():
             unit = dict_imp_cat_unit[imp_cat_eff[-1]]
             ax.set_xlabel(unit, fontsize=font_size)
             ax.set_xlim(dict_xlim_improv[imp_cat_eff])
-#            df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
             df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
 
             df_new = pd.DataFrame(
@@ -559,7 +448,9 @@ def plot_improv():
 
 
 
-def plot_improv_agg():
+def calc_improv_agg():
+    dict_imp_new_reg = calc_new_fp()
+
     print('plot_improv_agg')
     dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
 
@@ -573,7 +464,6 @@ def plot_improv_agg():
             if fp_eff not in dict_pot_imp_agg:
                 dict_pot_imp_agg[fp_eff] = {}
             if 'Ante' not in dict_pot_imp_agg[fp_eff]:
-#                df_old = pd.DataFrame(dict_imp_sel_reg_cons[imp_cat_eff], index=['import'])
                 df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
                 df_old_sum = df_old.sum(axis=1)
                 dict_pot_imp_agg[fp_eff]['Prior'] = float(
@@ -647,8 +537,17 @@ def plot_improv_agg():
     png_file_path = png_dir_path+png_file_name
     fig.savefig(png_file_path)
 
-def sourceshift():
+def shift_source():
     print('sourceshift')
+
+    dict_cntr_short_long = {}
+    with open(data_path+country_code_file_name, 'r') as read_file:
+        csv_file = csv.reader(read_file, delimiter='\t')
+        for row in csv_file:
+            cntr_short = row[0]
+            cntr_long = row[1]
+            dict_cntr_short_long[cntr_short] = cntr_long
+
     x_prod_cntr_min = 0.5
 
     df_cQe = dict_cf['e']
@@ -670,10 +569,41 @@ def sourceshift():
 
 
     dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
-    dict_imp_prod_cntr_sort = get_dict_imp_prod_cntr_sort(dict_imp,
-                                                          dict_imp_prod_sort_full,
-                                                          df_tY_eu28_fdsum,
-                                                          dict_imp_pME)
+    dict_tY = df_tY_eu28_fdsum.to_dict()
+    dict_tY_prod_cntr = {}
+    for tup_cntr_prod in dict_tY:
+        cntr, prod = tup_cntr_prod
+        if prod not in dict_tY_prod_cntr:
+            dict_tY_prod_cntr[prod] = {}
+        dict_tY_prod_cntr[prod][cntr] = dict_tY[tup_cntr_prod]
+
+    dict_imp_prod_cntr_sort = {}
+    for imp_cat in dict_imp_prod_sort_full:
+        dict_imp_prod_cntr_sort[imp_cat] = OrderedDict()
+        dict_imp_pME_prod_cntr = {}
+        for prod in dict_imp_prod_sort_full[imp_cat]:
+            dict_imp_prod_cntr_sort[imp_cat][prod] = OrderedDict()
+            dict_imp_prod_cntr = dict_imp[imp_cat][prod]
+            dict_imp_pME_prod_cntr[prod] = {}
+            imp_abs_prod = dict_imp_prod_sort_full[imp_cat][prod]
+
+            for cntr in dict_imp_prod_cntr:
+                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
+                dict_imp_pME_prod_cntr[prod][cntr] = (
+                        dict_imp_pME[imp_cat][prod][cntr])
+            list_imp_pME_prod_cntr_sort = sorted(
+                        dict_imp_pME_prod_cntr[prod].items(),
+                        key=operator.itemgetter(1))
+            imp_cum_prod_cntr = 0
+            for tup_cntr_imp_pME in list_imp_pME_prod_cntr_sort:
+                cntr, imp_pME_prod_cntr = tup_cntr_imp_pME
+                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
+                if imp_abs_prod > 0:
+                    imp_rel_prod_cntr = imp_abs_prod_cntr/imp_abs_prod
+                else:
+                    imp_rel_prod_cntr = 0.0
+                imp_cum_prod_cntr += imp_rel_prod_cntr
+                dict_imp_prod_cntr_sort[imp_cat][prod][cntr] = imp_abs_prod_cntr
 
 
     df_tY_eu28_cntr = df_tY_eu28.sum(axis=1, level=0)
@@ -684,8 +614,6 @@ def sourceshift():
     for cntr_fd in dict_tY_eu28_cntr:
         for tup_cntr_prod in dict_tY_eu28_cntr[cntr_fd]:
             cntr, prod = tup_cntr_prod
-#            cntr, prod_long = tup_cntr_prod
-#            prod = dict_prod_long_short[prod_long]
             if prod not in dict_tY_eu28_cntr_import:
                 dict_tY_eu28_cntr_import[prod] = {}
 
@@ -746,8 +674,6 @@ def sourceshift():
     dict_tY_world_ex_prod_cntr = {}
     for tup_cntr_prod in dict_tY_world_ex:
         cntr, prod = tup_cntr_prod
-#        cntr, prod_long = tup_cntr_prod
-#        prod = dict_prod_long_short[prod_long]
         if prod not in dict_tY_world_ex_prod_cntr:
             dict_tY_world_ex_prod_cntr[prod] = {}
         dict_tY_world_ex_prod_cntr[prod][cntr] = dict_tY_world_ex[tup_cntr_prod]
@@ -859,11 +785,6 @@ def sourceshift():
             unit = imp_cat[-1]
             ax.set_ylabel('{}/M€'.format(unit), fontsize=font_size)
             ax.set_xlabel('M€', fontsize=font_size)
-#            fp = dict_imp_cat_fp[imp_cat]
-#            fp_lower = fp.lower()
-#            prod_short = dict_prod_long_short[prod]
-#            prod_short_lower = prod_short.lower()
-#            prod_short_lower_strip = prod_short_lower.strip()
             fig.tight_layout(pad=0)
             dict_lim[imp_cat][prod] = {}
             dict_lim[imp_cat][prod]['x'] = (0, x_max)
@@ -1090,14 +1011,9 @@ def sourceshift():
             prod_short_lower_strip = prod_short_lower.strip()
             prod_short_lower_strip = prod_short_lower_strip.replace(':','')
             prod_short_lower_strip_us = prod_short_lower_strip.replace(' ','_')
-#            prod_lower = prod.lower()
-#            prod_lower_strip = prod_lower.strip()
-#            prod_lower_strip = prod_lower_strip.replace(':','')
-#            prod_lower_strip_us = prod_lower_strip.replace(' ','_')
             fp = dict_imp_cat_fp[imp_cat]
             fp_lower = fp.lower()
             fp_prod = fp_lower+'_'+prod_short_lower_strip_us
-#            fp_prod = fp_lower+'_'+prod_lower_strip_us
             fig.tight_layout(pad=0.1)
 
             shift_dir_path = result_dir_path+shift_dir_name
@@ -1140,9 +1056,12 @@ def calc_new_fp():
     for imp_cat in dict_df_tY_new:
         dict_imp_new[imp_cat] = {}
         df_tY_new = dict_df_tY_new[imp_cat]
-        dict_df_imp_new = get_dict_df_imp(dict_eb,
-                                          df_tY_new,
-                                          dict_cf)
+#        dict_df_imp_new = get_dict_df_imp(dict_eb,
+#                                          df_tY_new,
+#                                          dict_cf)
+
+        dict_df_imp_new = get_dict_df_imp(df_tY_new)
+
         # Cast dataframes with absolute impact to dict.
         dict_imp_new[imp_cat]= get_dict_imp(dict_df_imp_new)
 
@@ -1153,13 +1072,6 @@ def calc_new_fp():
             if imp_cat_eff not in dict_imp_new_reg[imp_cat_sel]:
                 dict_imp_new_reg[imp_cat_sel][imp_cat_eff] = {}
             for prod in dict_imp_new[imp_cat_sel][imp_cat_eff]:
-#                prod_short = dict_prod_long_short[prod]
-#                if prod_short not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
-#                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] = 0
-#                for cntr in dict_imp_new[imp_cat_sel][imp_cat_eff][prod]:
-#                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod_short] += (
-#                            dict_imp_new[imp_cat_sel][imp_cat_eff][prod][cntr])
-
                 if prod not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod] = 0
                 for cntr in dict_imp_new[imp_cat_sel][imp_cat_eff][prod]:
@@ -1170,16 +1082,6 @@ def calc_new_fp():
 ###############################################################################
 plt.close('all')
 
-def get_dict_cntr_short_long():
-    dict_cntr_short_long = {}
-    with open(data_path+country_code_file_name, 'r') as read_file:
-        csv_file = csv.reader(read_file, delimiter='\t')
-        for row in csv_file:
-            cntr_short = row[0]
-            cntr_long = row[1]
-            dict_cntr_short_long[cntr_short] = cntr_long
-    return dict_cntr_short_long
-dict_cntr_short_long = get_dict_cntr_short_long()
 
 #   Load shortened product names for plotting.
 def get_dict_prod_long_short():
@@ -1225,16 +1127,6 @@ def get_dict_imp_cat_magnitude():
     return dict_imp_cat_magnitude
 dict_imp_cat_magnitude = get_dict_imp_cat_magnitude()
 
-def get_dict_prod_order_cons():
-    prod_order_cons = []
-    with open(data_path+prod_order_file_name, 'r') as read_file:
-        csv_file = csv.reader(read_file, delimiter='\t')
-        for row in csv_file:
-            prod_order_cons.append(row[0])
-    prod_order_cons.reverse()
-    return prod_order_cons
-prod_order_cons = get_dict_prod_order_cons()
-
 #   Load EXIOBASE.
 if dict_eb_file_name in os.listdir(data_path):
     dict_eb = pickle.load(open(data_path+dict_eb_file_name, 'rb'))
@@ -1249,9 +1141,15 @@ dict_cf = get_dict_cf()
 
 #   Generate dictionary with list of EU28 countries.
 def get_list_reg_fd(reg_fd):
-    dict_reg_fd = get_reg_fd(reg_fd)
-    return dict_reg_fd[reg_fd]
-list_reg_fd = get_list_reg_fd('EU28')
+    if reg_fd == 'EU28':
+        with open(data_path+eu28_file_name) as read_file:
+            csv_file = csv.reader(read_file, delimiter='\t')
+            list_reg_fd = []
+            for row in csv_file:
+                list_reg_fd.append(row[0])
+    else:
+        list_reg_fd = [reg_fd]
+    return list_reg_fd
 
 
 font_size = 8.0
@@ -1259,16 +1157,18 @@ font_size = 8.0
 # Priority setting
 # Get dictionary with footprints.
 # final demand matrix of EU28
+list_reg_fd = get_list_reg_fd('EU28')
 df_tY_eu28 = dict_eb['tY'][list_reg_fd].copy()
 # final demand vector of EU28
-df_tY_eu28_full = df_tY_eu28.sum(axis=1)
+#df_tY_eu28_full = df_tY_eu28.sum(axis=1)
 
 for cntr in list_reg_fd:
     df_tY_eu28.loc[cntr, cntr] = 0
 df_tY_eu28_fdsum = df_tY_eu28.sum(axis=1)
-#   Calculate dataframes with absolute impact.
-dict_df_imp_full = get_dict_df_imp(dict_eb, df_tY_eu28_full, dict_cf)
-dict_df_imp = get_dict_df_imp(dict_eb, df_tY_eu28_fdsum, dict_cf)
+#dict_df_imp_full = get_dict_df_imp(df_tY_eu28_full)
+dict_df_imp = get_dict_df_imp(df_tY_eu28_fdsum)
+
+
 
 dict_imp_cat_sum = {}
 for imp_cat in dict_df_imp:
@@ -1278,25 +1178,6 @@ for imp_cat in dict_df_imp:
 #   Cast dataframes with absolute impact to dict.
 dict_imp = get_dict_imp(dict_df_imp)
 
-#dict_imp_prod_sort_cons = get_dict_imp_prod_sort_cons()
-
-#   Disaggregate impacts by domestic production, imports from in- and exEU28.
-dict_df_imp_cntr = {}
-dict_imp_cntr = {}
-for cntr_fd in list_reg_fd:
-    df_tY_cntr = dict_eb['tY'][cntr_fd].copy()
-    df_tY_cntr.loc[cntr_fd] = 0
-    df_tY_cntr_fdsum = df_tY_cntr.sum(axis=1)
-    # For all countries in EU28, calculate dataframes with absolute impact.
-    dict_df_imp_cntr[cntr_fd] = get_dict_df_imp(dict_eb,
-                                                df_tY_cntr_fdsum,
-                                                dict_cf)
-    # For all countries in EU28, cast dataframes with absolute impact to dict.
-    dict_imp_cntr[cntr_fd] = get_dict_imp(dict_df_imp_cntr[cntr_fd])
-
-#dict_imp_prod_sort_full = get_dict_imp_prod_sort()
-#dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
-#dict_imp_sel_reg_cons = get_dict_imp_sel_reg_cons()
 
 dict_imp_cat_unit = {}
 dict_imp_cat_unit['kg CO2 eq.'] = r'$Pg\/CO_2\/eq.$'
@@ -1306,22 +1187,7 @@ dict_imp_cat_unit['km2'] = r'$Gm^2$'
 
 ###############################################################################
 # Plot priority setting
-plot_priority_setting_individual_one_plot()
-
-
-###############################################################################
-#   Optimize impact per ME for highest contributing products
-
-#   Get dictionary of products sorted by absolute impact
-#   and sorted by highest contributing country of origin.
-
-#   Calculate absolute impact of imported products to EU28.
-
-dict_y_new = sourceshift()
-###############################################################################
-#   Plot potential improvement per impact category and product
-##   Reshape dictionary with new final demand from imports
-##   from [cntr][prod] to MultiIndex Dataframe format with tuple [(cntr, prod)]
-dict_imp_new_reg = calc_new_fp()
-plot_improv()
-plot_improv_agg()
+set_priority()
+dict_y_new = shift_source()
+calc_improv()
+calc_improv_agg()
