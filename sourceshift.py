@@ -20,48 +20,6 @@ import datetime
 
 import eb
 
-def get_date():
-    date_full = datetime.datetime.now()
-    return '{}{:02}{:02}'.format(date_full.year, date_full.month, date_full.day)
-date = get_date()
-
-#   Make result directories.
-method = '_source_shift/'
-result_dir_path = 'result/'+date+method
-priority_setting_dir_name = '1_priority_setting/'
-shift_dir_name = '2_shift/'
-reduc_dir_name ='3_reduction/'
-reduc_agg_dir_name='4_reduction_agg/'
-
-list_dir_name = []
-list_dir_name.append(priority_setting_dir_name)
-list_dir_name.append(shift_dir_name)
-list_dir_name.append(reduc_agg_dir_name)
-list_dir_name.append(reduc_dir_name)
-
-pdf_dir_name = 'pdf/'
-png_dir_name = 'png/'
-
-for dir_name in list_dir_name:
-    if not os.path.exists(result_dir_path+dir_name):
-        os.makedirs(result_dir_path+dir_name+pdf_dir_name)
-        os.makedirs(result_dir_path+dir_name+png_dir_name)
-
-mpl.rcParams['mathtext.default'] = 'regular'
-
-data_path = 'data/'
-eu28_file_name = 'EU28.txt'
-e_fp_file_name = 'list_impact_emission.txt'
-m_fp_file_name = 'list_impact_material.txt'
-r_fp_file_name = 'list_impact_resource.txt'
-country_code_file_name = 'country_codes.txt'
-prod_long_file_name = 'prod_long.txt'
-prod_short_file_name = 'prod_short.txt'
-dict_eb_file_name = 'dict_eb_proc.pkl'
-cf_long_footprint_file_name = 'cf_long_footprint.txt'
-cf_magnitude_file_name = 'cf_magnitude.txt'
-prod_order_file_name = 'prod_order.txt'
-
 
 def cm2inch(tup_cm):
     inch = 2.54
@@ -76,6 +34,11 @@ def get_cf(file_path, df_cQ):
         for row in csv_file:
             list_imp.append(tuple(row))
     return df_cQ.loc[list_imp]
+
+
+def get_date():
+    date = datetime.datetime.now()
+    return '{}{:02}{:02}'.format(date.year, date.month, date.day)
 
 
 def get_dict_cf():
@@ -127,6 +90,15 @@ def get_dict_imp(dict_df_imp):
     return dict_imp
 
 
+def get_dict_imp_cat_unit():
+    dict_imp_cat_unit = {}
+    dict_imp_cat_unit['kg CO2 eq.'] = r'$Pg\/CO_2\/eq.$'
+    dict_imp_cat_unit['kt'] = r'$Gt$'
+    dict_imp_cat_unit['Mm3'] = r'$Mm^3$'
+    dict_imp_cat_unit['km2'] = r'$Gm^2$'
+    return dict_imp_cat_unit
+
+
 def get_dict_imp_prod_sort(imp_cum_lim):
     dict_imp_prod_sort = {}
     for cat in dict_df_imp:
@@ -151,7 +123,6 @@ def get_dict_imp_prod_sort(imp_cum_lim):
                     dict_imp_prod_sort_cat[imp_cat][prod] = imp_abs
                     bool_add = False
 
-
         for imp_cat in dict_imp_prod_sort_cat:
             dict_imp_prod_sort[imp_cat] = dict_imp_prod_sort_cat[imp_cat]
 
@@ -162,27 +133,16 @@ def set_priority():
     print('priority setting')
     dict_xlim = {}
 
-
-    #   Disaggregate impacts by domestic production, imports from in- and exEU28.
+    dict_imp_cat_unit = get_dict_imp_cat_unit()
     dict_df_imp_cntr = {}
     dict_imp_cntr = {}
     for cntr_fd in list_reg_fd:
         df_tY_cntr = dict_eb['tY'][cntr_fd].copy()
         df_tY_cntr.loc[cntr_fd] = 0
         df_tY_cntr_fdsum = df_tY_cntr.sum(axis=1)
-        # For all countries in EU28, calculate dataframes with absolute impact.
-    #    dict_df_imp_cntr[cntr_fd] = get_dict_df_imp(dict_eb,
-    #                                                df_tY_cntr_fdsum,
-    #                                                dict_cf)
-
         dict_df_imp_cntr[cntr_fd] = get_dict_df_imp(df_tY_cntr_fdsum)
-
-        # For all countries in EU28, cast dataframes with absolute impact to dict.
         dict_imp_cntr[cntr_fd] = get_dict_imp(dict_df_imp_cntr[cntr_fd])
-
-
     dict_imp_prod_sort = get_dict_imp_prod_sort(0.5)
-
     dict_imp_sel = {}
     for cntr_fd in list_reg_fd:
         # For all countries in EU28, select highest contributing products.
@@ -194,7 +154,6 @@ def set_priority():
                 for prod in dict_imp_prod_sort[imp_cat_sel]:
                     dict_imp_sel[cntr_fd][imp_cat_sel][imp_cat_eff][prod] = (
                             dict_imp_cntr[cntr_fd][imp_cat_eff][prod])
-
 
     dict_imp_sel_reg = {}
     for cntr_fd in dict_imp_sel:
@@ -222,13 +181,13 @@ def set_priority():
             plot_id = imp_cat_eff_id+1
             plot_loc = 140+plot_id
             ax = fig.add_subplot(plot_loc)
-            df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_eff], index=['import'])
+            df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_eff],
+                              index=['import'])
             df.rename(columns=dict_prod_long_short, inplace=True)
             df.T.plot.barh(stacked=True,
                            ax=ax,
                            legend=False,
                            color='C0')
-
             xlim = ax.get_xlim()
             xlim_max_magn = 10**np.floor(np.log10(xlim[1]))
             xlim_max_ceil = math.ceil(xlim[1]/xlim_max_magn)*xlim_max_magn
@@ -238,11 +197,11 @@ def set_priority():
             if xlim[1] > dict_xlim[imp_cat_eff][1]:
                 dict_xlim[imp_cat_eff] = tup_xlim_max_ceil
 
-
     analysis_name = 'priority_setting'
     dict_prod_order = {}
     for imp_cat_sel in dict_imp_sel_reg:
-        df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel], index=['import'])
+        df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel],
+                          index=['import'])
         df.rename(columns=dict_prod_long_short, inplace=True)
         df_sum_sort = df.sum().sort_values()
         prod_order = list(df_sum_sort.index)
@@ -264,7 +223,8 @@ def set_priority():
         fp = dict_imp_cat_fp[imp_cat_sel]
         unit = dict_imp_cat_unit[imp_cat_sel[-1]]
         ax.set_xlabel('{} [{}]'.format(fp, unit), fontsize=font_size)
-        df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel], index=['import'])
+        df = pd.DataFrame(dict_imp_sel_reg[imp_cat_sel][imp_cat_sel],
+                          index=['import'])
         df.rename(columns=dict_prod_long_short, inplace=True)
         df = df.reindex(prod_order, axis=1)
         column_name_dummy = ''
@@ -278,11 +238,10 @@ def set_priority():
             column_name_dummy += ' '
 
         df.T.plot.barh(stacked=True,
-                                     ax=ax,
-                                     legend=False,
-                                     color='C0',
-                                     width=0.8)
-
+                       ax=ax,
+                       legend=False,
+                       color='C0',
+                       width=0.8)
 
         yticklabels = ax.get_yticklabels()
         ax.set_yticklabels(yticklabels, fontsize=font_size)
@@ -323,7 +282,7 @@ def set_priority():
 
 def calc_improv():
     dict_imp_new_reg = calc_new_fp()
-
+    dict_imp_cat_unit = get_dict_imp_cat_unit()
     prod_order_cons = []
     with open(data_path+prod_order_file_name, 'r') as read_file:
         csv_file = csv.reader(read_file, delimiter='\t')
@@ -331,8 +290,6 @@ def calc_improv():
             prod_order_cons.append(row[0])
     prod_order_cons.reverse()
 
-
-    print('plot_improv')
     plt.close('all')
     fig = plt.figure(figsize=cm2inch((16, 1+13*0.4)))
     dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
@@ -344,11 +301,12 @@ def calc_improv():
             plot_id = imp_cat_eff_id+1
             plot_loc = 140+plot_id
             ax = fig.add_subplot(plot_loc)
-            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
-            df_new = pd.DataFrame(
-                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
+            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff],
+                                  index=['import'])
+            df_new = pd.DataFrame(dict_imp_new_reg[imp_cat_sel][imp_cat_eff],
+                                  index=['import'])
             df = df_new-df_old
-            df.rename(columns = dict_prod_long_short, inplace=True)
+            df.rename(columns=dict_prod_long_short, inplace=True)
             df = df.reindex(prod_order_cons, axis=1)
             df_color = df.loc['import'] <= 0
             df.T.plot.barh(stacked=True,
@@ -377,17 +335,13 @@ def calc_improv():
                                   dict_xlim_improv[imp_cat_eff][1]])
                 dict_xlim_improv[imp_cat_eff] = xlim_new
             if xlim_max_ceil > dict_xlim_improv[imp_cat_eff][1]:
-                xlim_new = tuple([dict_xlim_improv[imp_cat_eff][0], xlim_max_ceil])
+                xlim_new = tuple([dict_xlim_improv[imp_cat_eff][0],
+                                  xlim_max_ceil])
                 dict_xlim_improv[imp_cat_eff] = xlim_new
-
     plt.close('all')
 
     for imp_cat_sel_id, imp_cat_sel in enumerate(dict_imp_new_reg):
-
-        fig = plt.figure(
-                figsize=cm2inch(
-                        (16,
-                         len(prod_order_cons)*.4+2)))
+        fig = plt.figure(figsize=cm2inch((16, len(prod_order_cons)*.4+2)))
         for imp_cat_eff_id, imp_cat_eff in (
                 enumerate(dict_imp_new_reg[imp_cat_sel])):
             plot_id = imp_cat_eff_id+1
@@ -398,12 +352,13 @@ def calc_improv():
             unit = dict_imp_cat_unit[imp_cat_eff[-1]]
             ax.set_xlabel(unit, fontsize=font_size)
             ax.set_xlim(dict_xlim_improv[imp_cat_eff])
-            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
-
+            df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff],
+                                  index=['import'])
             df_new = pd.DataFrame(
-                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
+                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff],
+                    index=['import'])
             df = df_new-df_old
-            df.rename(columns = dict_prod_long_short, inplace=True)
+            df.rename(columns=dict_prod_long_short, inplace=True)
             df = df.reindex(prod_order_cons, axis=1)
             df_color = df.loc['import'] <= 0
             df.T.plot.barh(stacked=True,
@@ -422,7 +377,8 @@ def calc_improv():
             plt.locator_params(axis='x', nbins=4)
             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
             xtick_magnitude = dict_imp_cat_magnitude[imp_cat_eff]
-            list_xtick = [i/xtick_magnitude for i in dict_xlim_improv[imp_cat_eff]]
+            list_xtick = (
+                    [i/xtick_magnitude for i in dict_xlim_improv[imp_cat_eff]])
             ax.set_xticks(list(dict_xlim_improv[imp_cat_eff]))
             ax.set_xticklabels(list_xtick, fontsize=font_size)
 
@@ -447,7 +403,6 @@ def calc_improv():
         fig.savefig(fig_file_path)
 
 
-
 def calc_improv_agg():
     dict_imp_new_reg = calc_new_fp()
 
@@ -464,16 +419,16 @@ def calc_improv_agg():
             if fp_eff not in dict_pot_imp_agg:
                 dict_pot_imp_agg[fp_eff] = {}
             if 'Ante' not in dict_pot_imp_agg[fp_eff]:
-                df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff], index=['import'])
+                df_old = pd.DataFrame(dict_imp_prod_sort_full[imp_cat_eff],
+                                      index=['import'])
                 df_old_sum = df_old.sum(axis=1)
                 dict_pot_imp_agg[fp_eff]['Prior'] = float(
                         df_old_sum['import'])
-            df_new = pd.DataFrame(
-                    dict_imp_new_reg[imp_cat_sel][imp_cat_eff], index=['import'])
+            df_new = pd.DataFrame(dict_imp_new_reg[imp_cat_sel][imp_cat_eff],
+                                  index=['import'])
             df_new_sum = df_new.sum(axis=1)
             dict_pot_imp_agg[fp_eff][fp_sel] = float(
                     df_new_sum['import'])
-
 
     dict_pot_imp_agg_rel = {}
     for fp_eff_id, fp_eff in enumerate(dict_pot_imp_agg):
@@ -514,15 +469,17 @@ def calc_improv_agg():
         ax.set_rticks([0.50, 1])
         ax.yaxis.set_ticklabels(['50%', '100%'], fontsize=font_size)
         ax.set_rlabel_position(0)
-        xtick_count = np.arange(2*math.pi/8, 2*math.pi+2*math.pi/8, 2*math.pi/4)
+        xtick_count = np.arange(2*math.pi/8,
+                                2*math.pi+2*math.pi/8,
+                                2*math.pi/4)
         ax.set_xticks(xtick_count)
         ax.set_xticklabels(list_xticklabel, fontsize=font_size)
-        ax.set_ylim([0,1.0])
+        ax.set_ylim([0, 1.0])
         y_val = list_imp_rel
         y_val.append(y_val[0])
         x_val = list(xtick_count)
         x_val.append(x_val[0])
-        ax.plot(x_val, y_val, color = 'C2')
+        ax.plot(x_val, y_val, color='C2')
         ax_title = 'Optimized {} footprint'.format(fp_sel.lower())
         ax.set_title(ax_title, fontsize=font_size)
     plt.tight_layout(pad=3)
@@ -536,6 +493,20 @@ def calc_improv_agg():
     png_dir_path = reduc_agg_dir_path+png_dir_name
     png_file_path = png_dir_path+png_file_name
     fig.savefig(png_file_path)
+
+
+def make_result_dir():
+    list_dir_name = []
+    list_dir_name.append(priority_setting_dir_name)
+    list_dir_name.append(shift_dir_name)
+    list_dir_name.append(reduc_agg_dir_name)
+    list_dir_name.append(reduc_dir_name)
+
+    for dir_name in list_dir_name:
+        if not os.path.exists(result_dir_path+dir_name):
+            os.makedirs(result_dir_path+dir_name+pdf_dir_name)
+            os.makedirs(result_dir_path+dir_name+png_dir_name)
+
 
 def shift_source():
     print('sourceshift')
@@ -553,30 +524,17 @@ def shift_source():
     df_cQe = dict_cf['e']
     df_cQm = dict_cf['m']
     df_cQr = dict_cf['r']
-
     df_cRe = dict_eb['cRe']
     df_cRm = dict_eb['cRm']
     df_cRr = dict_eb['cRr']
-
     df_cL = dict_eb['cL']
-
     dict_df_imp_pME = {}
     dict_df_imp_pME['e'] = df_cQe.dot(df_cRe).dot(df_cL)
     dict_df_imp_pME['m'] = df_cQm.dot(df_cRm).dot(df_cL)
     dict_df_imp_pME['r'] = df_cQr.dot(df_cRr).dot(df_cL)
-
     dict_imp_pME = get_dict_imp(dict_df_imp_pME)
 
-
     dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
-    dict_tY = df_tY_eu28_fdsum.to_dict()
-    dict_tY_prod_cntr = {}
-    for tup_cntr_prod in dict_tY:
-        cntr, prod = tup_cntr_prod
-        if prod not in dict_tY_prod_cntr:
-            dict_tY_prod_cntr[prod] = {}
-        dict_tY_prod_cntr[prod][cntr] = dict_tY[tup_cntr_prod]
-
     dict_imp_prod_cntr_sort = {}
     for imp_cat in dict_imp_prod_sort_full:
         dict_imp_prod_cntr_sort[imp_cat] = OrderedDict()
@@ -585,69 +543,34 @@ def shift_source():
             dict_imp_prod_cntr_sort[imp_cat][prod] = OrderedDict()
             dict_imp_prod_cntr = dict_imp[imp_cat][prod]
             dict_imp_pME_prod_cntr[prod] = {}
-            imp_abs_prod = dict_imp_prod_sort_full[imp_cat][prod]
-
             for cntr in dict_imp_prod_cntr:
-                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
                 dict_imp_pME_prod_cntr[prod][cntr] = (
                         dict_imp_pME[imp_cat][prod][cntr])
             list_imp_pME_prod_cntr_sort = sorted(
                         dict_imp_pME_prod_cntr[prod].items(),
                         key=operator.itemgetter(1))
-            imp_cum_prod_cntr = 0
             for tup_cntr_imp_pME in list_imp_pME_prod_cntr_sort:
                 cntr, imp_pME_prod_cntr = tup_cntr_imp_pME
-                imp_abs_prod_cntr = dict_imp_prod_cntr[cntr]
-                if imp_abs_prod > 0:
-                    imp_rel_prod_cntr = imp_abs_prod_cntr/imp_abs_prod
-                else:
-                    imp_rel_prod_cntr = 0.0
-                imp_cum_prod_cntr += imp_rel_prod_cntr
-                dict_imp_prod_cntr_sort[imp_cat][prod][cntr] = imp_abs_prod_cntr
+                dict_imp_prod_cntr_sort[imp_cat][prod][cntr] = (
+                        dict_imp_prod_cntr[cntr])
 
 
     df_tY_eu28_cntr = df_tY_eu28.sum(axis=1, level=0)
 
     dict_tY_eu28_cntr = df_tY_eu28_cntr.to_dict()
     dict_tY_eu28_cntr_import = {}
-    dict_tY_eu28_cntr_dom = {}
     for cntr_fd in dict_tY_eu28_cntr:
         for tup_cntr_prod in dict_tY_eu28_cntr[cntr_fd]:
             cntr, prod = tup_cntr_prod
             if prod not in dict_tY_eu28_cntr_import:
                 dict_tY_eu28_cntr_import[prod] = {}
 
-            if prod not in dict_tY_eu28_cntr_dom:
-                dict_tY_eu28_cntr_dom[prod] = {}
-
             if cntr not in dict_tY_eu28_cntr_import[prod]:
                 dict_tY_eu28_cntr_import[prod][cntr] = 0
 
-            if cntr not in dict_tY_eu28_cntr_dom[prod]:
-                dict_tY_eu28_cntr_dom[prod][cntr] = 0
-
-            if cntr_fd != cntr:
+            if cntr_fd is not cntr:
                 dict_tY_eu28_cntr_import[prod][cntr] += (
                         dict_tY_eu28_cntr[cntr_fd][tup_cntr_prod])
-            else:
-                dict_tY_eu28_cntr_dom[prod][cntr] += (
-                        dict_tY_eu28_cntr[cntr_fd][tup_cntr_prod])
-
-    dict_tY_eu28_old_dom = {}
-    for prod in dict_tY_eu28_cntr_dom:
-        for cntr in dict_tY_eu28_cntr_dom[prod]:
-            tup_cntr_prod = (cntr, prod)
-            dict_tY_eu28_old_dom[tup_cntr_prod] = dict_tY_eu28_cntr_dom[prod][cntr]
-    df_tY_eu28_old_dom = pd.DataFrame(dict_tY_eu28_old_dom, index=['domestic']).T
-    df_tY_eu28_old_dom = df_tY_eu28_old_dom.reindex(index=df_tY_eu28_fdsum.index)
-    dict_tY_eu28_old_imp = {}
-    for prod in dict_tY_eu28_cntr_import:
-        for cntr in dict_tY_eu28_cntr_import[prod]:
-            tup_cntr_prod = (cntr, prod)
-            dict_tY_eu28_old_imp[tup_cntr_prod] = (
-                    dict_tY_eu28_cntr_import[prod][cntr])
-    df_tY_eu28_old_imp = pd.DataFrame(dict_tY_eu28_old_imp, index=['import']).T
-    df_tY_eu28_old_imp = df_tY_eu28_old_imp.reindex(index=df_tY_eu28_fdsum.index)
 
     #   Get dictionary with total output of products with highest impact
     #   for all countries.
@@ -662,7 +585,6 @@ def shift_source():
             dict_tX_world_prod_cntr[prod] = {}
         dict_tX_world_prod_cntr[prod][cntr] = dict_tX_world[tup_cntr_prod]
 
-    # remove domestic use
     #   Get dictionary with total output of products with highest impact
     #   for all countries.
     df_tY_world = dict_eb['tY'].copy()
@@ -676,25 +598,18 @@ def shift_source():
         cntr, prod = tup_cntr_prod
         if prod not in dict_tY_world_ex_prod_cntr:
             dict_tY_world_ex_prod_cntr[prod] = {}
-        dict_tY_world_ex_prod_cntr[prod][cntr] = dict_tY_world_ex[tup_cntr_prod]
+        dict_tY_world_ex_prod_cntr[prod][cntr] = (
+                dict_tY_world_ex[tup_cntr_prod])
 
-    #       Plot current impact per ME against %imported by EU28 vs total output of
-    #       country per product.
-    y_sum_mg_old = 0
-    dict_imp_pME_old = {}
-    dict_y_old = {}
     dict_lim = {}
-
     dict_ax = {}
-
-
     dict_imp_cat_prod_imp_abs = {}
     dict_imp_cat_prod_imp_abs_sum = {}
     for imp_cat in dict_imp_prod_cntr_sort:
         dict_imp_cat_prod_imp_abs[imp_cat] = {}
         dict_imp_cat_prod_imp_abs_sum[imp_cat] = {}
         for prod in dict_imp_prod_cntr_sort[imp_cat]:
-            dict_imp_cat_prod_imp_abs[imp_cat][prod] ={}
+            dict_imp_cat_prod_imp_abs[imp_cat][prod] = {}
             imp_abs_sum = 0
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
                 imp_abs = dict_imp_prod_cntr_sort[imp_cat][prod][cntr]
@@ -702,13 +617,13 @@ def shift_source():
                 imp_abs_sum += imp_abs
             dict_imp_cat_prod_imp_abs_sum[imp_cat][prod] = imp_abs_sum
 
-
     dict_imp_cat_prod_cntr_sort_trunc = {}
     for imp_cat in dict_imp_cat_prod_imp_abs:
         dict_imp_cat_prod_cntr_sort_trunc[imp_cat] = {}
         for prod in dict_imp_cat_prod_imp_abs[imp_cat]:
-            list_imp_cat_prod_sort = sorted(dict_imp_cat_prod_imp_abs[imp_cat][prod].items(),
-                                            key=operator.itemgetter(1), reverse=True)
+            list_imp_cat_prod_sort = sorted(
+                    dict_imp_cat_prod_imp_abs[imp_cat][prod].items(),
+                    key=operator.itemgetter(1), reverse=True)
             list_imp_cat_prod_sort_trunc = []
             imp_abs_sum = dict_imp_cat_prod_imp_abs_sum[imp_cat][prod]
             if imp_abs_sum > 0:
@@ -724,17 +639,13 @@ def shift_source():
                     elif bool_add:
                         list_imp_cat_prod_sort_trunc.append(cntr)
                         bool_add = False
-            dict_imp_cat_prod_cntr_sort_trunc[imp_cat][prod] = list_imp_cat_prod_sort_trunc
-
+            dict_imp_cat_prod_cntr_sort_trunc[imp_cat][prod] = (
+                    list_imp_cat_prod_sort_trunc)
 
     for imp_cat in dict_imp_prod_cntr_sort:
-        dict_imp_pME_old[imp_cat] = {}
-        dict_y_old[imp_cat] = {}
         dict_lim[imp_cat] = {}
         dict_ax[imp_cat] = {}
         for prod in dict_imp_prod_cntr_sort[imp_cat]:
-            dict_imp_pME_old[imp_cat][prod] = {}
-            dict_y_old[imp_cat][prod] = {}
             plt.close('all')
             x_start = 0
             y_start = 0
@@ -742,16 +653,13 @@ def shift_source():
             list_rect_x = []
             fig = plt.figure(figsize=cm2inch((16, 8)))
             ax = plt.gca()
-            y_prod_cntr_sum = 0
-            imp_abs_old = 0
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
                 imp_pME_prod_cntr = dict_imp_pME[imp_cat][prod][cntr]
                 y_prod_cntr = dict_tY_eu28_cntr_import[prod][cntr]
-                y_prod_cntr_sum += y_prod_cntr
-                y_sum_mg_old += y_prod_cntr
                 x_prod_cntr = dict_tY_world_ex_prod_cntr[prod][cntr]
                 if x_prod_cntr >= x_prod_cntr_min:
-                    if cntr in dict_imp_cat_prod_cntr_sort_trunc[imp_cat][prod]:
+                    if cntr in (
+                            dict_imp_cat_prod_cntr_sort_trunc[imp_cat][prod]):
                         cntr_long = dict_cntr_short_long[cntr]
                         plt.text(x_start+y_prod_cntr/2,
                                  y_start+imp_pME_prod_cntr,
@@ -761,8 +669,6 @@ def shift_source():
                                  horizontalalignment='center',
                                  fontsize=font_size,
                                  color='C0')
-                    dict_imp_pME_old[imp_cat][prod][cntr] = imp_pME_prod_cntr
-                    dict_y_old[imp_cat][prod][cntr] = y_prod_cntr
                     rect_y = patches.Rectangle((x_start, y_start),
                                                y_prod_cntr,
                                                imp_pME_prod_cntr)
@@ -771,7 +677,6 @@ def shift_source():
                                                imp_pME_prod_cntr)
                     list_rect_y.append(rect_y)
                     list_rect_x.append(rect_x)
-                    imp_abs_old += y_prod_cntr*imp_pME_prod_cntr
                     x_max = x_start+x_prod_cntr
                     y_max = y_start+imp_pME_prod_cntr
                     x_start += x_prod_cntr
@@ -781,22 +686,10 @@ def shift_source():
             ax.add_collection(col_rect_x)
             ax.add_collection(col_rect_y)
             ax.autoscale()
-            fig = ax.get_figure()
-            unit = imp_cat[-1]
-            ax.set_ylabel('{}/M€'.format(unit), fontsize=font_size)
-            ax.set_xlabel('M€', fontsize=font_size)
-            fig.tight_layout(pad=0)
             dict_lim[imp_cat][prod] = {}
             dict_lim[imp_cat][prod]['x'] = (0, x_max)
             dict_lim[imp_cat][prod]['y'] = (0, y_max)
-            plt.locator_params(axis='both', nbins=4, tight=True)
-            plt.xticks(fontsize=font_size)
-            plt.yticks(fontsize=font_size)
-            ax.ticklabel_format(style='sci', axis='both', scilimits=(0, 0))
             dict_ax[imp_cat][prod] = ax
-            fig.tight_layout(pad=0.1)
-
-
 
     dict_tY_prod = {}
     for prod in dict_tY_eu28_cntr_import:
@@ -806,10 +699,6 @@ def shift_source():
 
     dict_imp_pME_new = {}
     dict_y_new = {}
-    #   Plot optimized impact per ME against %imported by EU28 vs
-    #   total output of country per product
-    y_sum_mg_new = 0
-
     for imp_cat in dict_imp_prod_cntr_sort:
         dict_imp_pME_new[imp_cat] = {}
         dict_y_new[imp_cat] = {}
@@ -821,7 +710,6 @@ def shift_source():
             list_rect_x = []
             ax = dict_ax[imp_cat][prod]
             y_prod = dict_tY_prod[prod]
-            imp_abs_new = 0
             dict_imp_pME_new[imp_cat][prod] = {}
             dict_y_new[imp_cat][prod] = {}
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
@@ -830,21 +718,17 @@ def shift_source():
                 x_prod_cntr = dict_tY_world_ex_prod_cntr[prod][cntr]
                 if x_prod_cntr >= x_prod_cntr_min:
                     if x_prod_cntr < y_prod:
-                        y_sum_mg_new += x_prod_cntr
                         rect_y = patches.Rectangle((x_start, y_start),
                                                    x_prod_cntr,
                                                    imp_pME_prod_cntr)
                         y_prod -= x_prod_cntr
-                        imp_abs_new += x_prod_cntr*imp_pME_prod_cntr
                         dict_y_new[imp_cat][prod][cntr] = x_prod_cntr
                         dict_imp_pME_new[imp_cat][prod][cntr] = (
                                 imp_pME_prod_cntr)
                     elif y_prod > 0:
-                        y_sum_mg_new += y_prod
                         rect_y = patches.Rectangle((x_start, y_start),
                                                    y_prod,
                                                    imp_pME_prod_cntr)
-                        imp_abs_new += y_prod*imp_pME_prod_cntr
                         dict_y_new[imp_cat][prod][cntr] = y_prod
                         dict_imp_pME_new[imp_cat][prod][cntr] = (
                                 imp_pME_prod_cntr)
@@ -859,7 +743,8 @@ def shift_source():
                     rect_y = patches.Rectangle((0, 0), 0, 0)
                     list_rect_y.append(rect_y)
 
-            col_rect_y = mpl_col.PatchCollection(list_rect_y, facecolor='green')
+            col_rect_y = mpl_col.PatchCollection(list_rect_y,
+                                                 facecolor='green')
             col_rect_x = mpl_col.PatchCollection(list_rect_x, facecolor='gray')
             col_rect_y.set_alpha(0.5)
 
@@ -869,7 +754,7 @@ def shift_source():
         dict_imp_cat_prod_imp_abs_new[imp_cat] = {}
         dict_imp_cat_prod_imp_abs_new_sum[imp_cat] = {}
         for prod in dict_imp_pME_new[imp_cat]:
-            dict_imp_cat_prod_imp_abs_new[imp_cat][prod] ={}
+            dict_imp_cat_prod_imp_abs_new[imp_cat][prod] = {}
             imp_abs_sum = 0
             for cntr in dict_imp_pME_new[imp_cat][prod]:
                 imp_pME = dict_imp_pME_new[imp_cat][prod][cntr]
@@ -879,13 +764,13 @@ def shift_source():
                 dict_imp_cat_prod_imp_abs_new[imp_cat][prod][cntr] = imp_abs
             dict_imp_cat_prod_imp_abs_new_sum[imp_cat][prod] = imp_abs_sum
 
-
     dict_imp_cat_prod_cntr_sort_new_trunc = {}
     for imp_cat in dict_imp_cat_prod_imp_abs_new:
         dict_imp_cat_prod_cntr_sort_new_trunc[imp_cat] = {}
         for prod in dict_imp_cat_prod_imp_abs_new[imp_cat]:
-            list_imp_cat_prod_sort = sorted(dict_imp_cat_prod_imp_abs_new[imp_cat][prod].items(),
-                                            key=operator.itemgetter(1), reverse=True)
+            list_imp_cat_prod_sort = sorted(
+                    dict_imp_cat_prod_imp_abs_new[imp_cat][prod].items(),
+                    key=operator.itemgetter(1), reverse=True)
             list_imp_cat_prod_sort_trunc = []
             imp_abs_sum = dict_imp_cat_prod_imp_abs_new_sum[imp_cat][prod]
             if imp_abs_sum > 0:
@@ -901,8 +786,8 @@ def shift_source():
                     elif bool_add:
                         list_imp_cat_prod_sort_trunc.append(cntr)
                         bool_add = False
-            dict_imp_cat_prod_cntr_sort_new_trunc[imp_cat][prod] = list_imp_cat_prod_sort_trunc
-
+            dict_imp_cat_prod_cntr_sort_new_trunc[imp_cat][prod] = (
+                    list_imp_cat_prod_sort_trunc)
 
     dict_tY_prod = {}
     for prod in dict_tY_eu28_cntr_import:
@@ -910,10 +795,7 @@ def shift_source():
         for cntr in dict_tY_eu28_cntr_import[prod]:
             dict_tY_prod[prod] += dict_tY_eu28_cntr_import[prod][cntr]
 
-    dict_cntr = {}
     for imp_cat in dict_imp_prod_cntr_sort:
-        dict_imp_pME_new[imp_cat] = {}
-        dict_y_new[imp_cat] = {}
         for prod in dict_imp_prod_cntr_sort[imp_cat]:
             plt.close('all')
             x_start = 0
@@ -922,9 +804,6 @@ def shift_source():
             list_rect_x = []
             ax = dict_ax[imp_cat][prod]
             y_prod = dict_tY_prod[prod]
-            imp_abs_new = 0
-            dict_imp_pME_new[imp_cat][prod] = {}
-            dict_y_new[imp_cat][prod] = {}
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
                 imp_pME_prod_cntr = dict_imp_pME[imp_cat][prod][cntr]
                 y_prod_cntr = dict_tY_eu28_cntr_import[prod][cntr]
@@ -935,7 +814,6 @@ def shift_source():
                             cntr_long = dict_cntr_short_long[cntr]
                             x_text = x_start+x_prod_cntr/2
                             y_text = y_start+imp_pME_prod_cntr
-                            dict_cntr[cntr] = (x_text, y_text)
                             ax.text(x_text,
                                     y_text,
                                     ' '+cntr_long,
@@ -944,21 +822,15 @@ def shift_source():
                                     horizontalalignment='center',
                                     fontsize=font_size,
                                     color='green')
-                        y_sum_mg_new += x_prod_cntr
                         rect_y = patches.Rectangle((x_start, y_start),
                                                    x_prod_cntr,
                                                    imp_pME_prod_cntr)
                         y_prod -= x_prod_cntr
-                        imp_abs_new += x_prod_cntr*imp_pME_prod_cntr
-                        dict_y_new[imp_cat][prod][cntr] = x_prod_cntr
-                        dict_imp_pME_new[imp_cat][prod][cntr] = (
-                                imp_pME_prod_cntr)
                     elif y_prod > 0:
                         if cntr in dict_imp_cat_prod_cntr_sort_new_trunc[imp_cat][prod]:
                             cntr_long = dict_cntr_short_long[cntr]
                             x_text = x_start+x_prod_cntr/2
                             y_text = y_start+imp_pME_prod_cntr
-                            dict_cntr[cntr] = (x_text, y_text)
                             ax.text(x_text,
                                     y_text,
                                     ' '+cntr_long,
@@ -967,14 +839,9 @@ def shift_source():
                                     horizontalalignment='center',
                                     fontsize=font_size,
                                     color='green')
-                        y_sum_mg_new += y_prod
                         rect_y = patches.Rectangle((x_start, y_start),
                                                    y_prod,
                                                    imp_pME_prod_cntr)
-                        imp_abs_new += y_prod*imp_pME_prod_cntr
-                        dict_y_new[imp_cat][prod][cntr] = y_prod
-                        dict_imp_pME_new[imp_cat][prod][cntr] = (
-                                imp_pME_prod_cntr)
                         y_prod -= y_prod
 
                     rect_x = patches.Rectangle((x_start, y_start),
@@ -987,8 +854,10 @@ def shift_source():
                     rect_y = patches.Rectangle((0, 0), 0, 0)
                     list_rect_y.append(rect_y)
 
-            col_rect_y = mpl_col.PatchCollection(list_rect_y, facecolor='green')
-            col_rect_x = mpl_col.PatchCollection(list_rect_x, facecolor='gray')
+            col_rect_y = mpl_col.PatchCollection(list_rect_y,
+                                                 facecolor='green')
+            col_rect_x = mpl_col.PatchCollection(list_rect_x,
+                                                 facecolor='gray')
             col_rect_y.set_alpha(0.5)
             ax.add_collection(col_rect_y)
             ax.autoscale()
@@ -998,10 +867,7 @@ def shift_source():
             ax.set_xlabel('M€', fontsize=font_size)
             ax.set_xlim(dict_lim[imp_cat][prod]['x'])
             ax.set_ylim(dict_lim[imp_cat][prod]['y'])
-
-            plt.locator_params(axis='both', nbins=4, tight=True)
-            plt.xticks(fontsize=font_size)
-            plt.yticks(fontsize=font_size)
+            ax.locator_params(axis='both', nbins=4, tight=True)
             ax.ticklabel_format(style='sci', axis='both', scilimits=(0, 0))
             ax.yaxis.offsetText.set_fontsize(font_size)
             ax.xaxis.offsetText.set_fontsize(font_size)
@@ -1009,8 +875,9 @@ def shift_source():
             prod_short = dict_prod_long_short[prod]
             prod_short_lower = prod_short.lower()
             prod_short_lower_strip = prod_short_lower.strip()
-            prod_short_lower_strip = prod_short_lower_strip.replace(':','')
-            prod_short_lower_strip_us = prod_short_lower_strip.replace(' ','_')
+            prod_short_lower_strip = prod_short_lower_strip.replace(':', '')
+            prod_short_lower_strip_us = prod_short_lower_strip.replace(' ',
+                                                                       '_')
             fp = dict_imp_cat_fp[imp_cat]
             fp_lower = fp.lower()
             fp_prod = fp_lower+'_'+prod_short_lower_strip_us
@@ -1028,7 +895,8 @@ def shift_source():
             png_file_path = png_dir_path+png_file_name
             fig.savefig(png_file_path)
     return dict_y_new
-#   Calculate new impact
+
+
 def calc_new_fp():
     print('calc_new_fp')
     dict_df_tY_import_new = {}
@@ -1041,49 +909,39 @@ def calc_new_fp():
 
     #   For each impact category make new final demand DataFrames
     dict_df_tY_new = {}
-    for imp_cat_id, imp_cat in enumerate(dict_df_tY_import_new):
+    dict_imp_new_reg = {}
+
+    for imp_cat_id, imp_cat_sel in enumerate(dict_df_tY_import_new):
         #    Fill import column
         df_tY_eu28 = dict_eb['tY'][list_reg_fd].copy()
         df_tY_eu28_fdsum = df_tY_eu28.sum(axis=1)
         df_tY_eu28_import = df_tY_eu28_fdsum.copy()
         df_tY_eu28_import[:] = 0
-        df_tY_eu28_import[list(dict_df_tY_import_new[imp_cat].keys())] = (
-                list(dict_df_tY_import_new[imp_cat].values()))
+        df_tY_eu28_import[list(dict_df_tY_import_new[imp_cat_sel].keys())] = (
+                list(dict_df_tY_import_new[imp_cat_sel].values()))
         df_tY_eu28_import.columns = ['import']
-        dict_df_tY_new[imp_cat] = df_tY_eu28_import
+#        dict_df_tY_new[imp_cat_sel] = df_tY_eu28_import
+#
+##    for imp_cat_sel in dict_df_tY_new:
+#        df_tY_new = dict_df_tY_new[imp_cat_sel]
 
-    dict_imp_new = {}
-    for imp_cat in dict_df_tY_new:
-        dict_imp_new[imp_cat] = {}
-        df_tY_new = dict_df_tY_new[imp_cat]
-#        dict_df_imp_new = get_dict_df_imp(dict_eb,
-#                                          df_tY_new,
-#                                          dict_cf)
+#        dict_df_imp_new = get_dict_df_imp(df_tY_new)
+        dict_df_imp_new = get_dict_df_imp(df_tY_eu28_import)
 
-        dict_df_imp_new = get_dict_df_imp(df_tY_new)
-
-        # Cast dataframes with absolute impact to dict.
-        dict_imp_new[imp_cat]= get_dict_imp(dict_df_imp_new)
-
-    dict_imp_new_reg = {}
-    for imp_cat_sel in dict_imp_new:
+        dict_imp_new = get_dict_imp(dict_df_imp_new)
         dict_imp_new_reg[imp_cat_sel] = {}
-        for imp_cat_eff in dict_imp_new[imp_cat_sel]:
+        for imp_cat_eff in dict_imp_new:
             if imp_cat_eff not in dict_imp_new_reg[imp_cat_sel]:
                 dict_imp_new_reg[imp_cat_sel][imp_cat_eff] = {}
-            for prod in dict_imp_new[imp_cat_sel][imp_cat_eff]:
+            for prod in dict_imp_new[imp_cat_eff]:
                 if prod not in dict_imp_new_reg[imp_cat_sel][imp_cat_eff]:
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod] = 0
-                for cntr in dict_imp_new[imp_cat_sel][imp_cat_eff][prod]:
+                for cntr in dict_imp_new[imp_cat_eff][prod]:
                     dict_imp_new_reg[imp_cat_sel][imp_cat_eff][prod] += (
-                            dict_imp_new[imp_cat_sel][imp_cat_eff][prod][cntr])
-
+                            dict_imp_new[imp_cat_eff][prod][cntr])
     return dict_imp_new_reg
-###############################################################################
-plt.close('all')
 
 
-#   Load shortened product names for plotting.
 def get_dict_prod_long_short():
     list_prod_long = []
     with open(data_path+prod_long_file_name) as read_file:
@@ -1103,7 +961,7 @@ def get_dict_prod_long_short():
         prod_short = list_prod_short[prod_id]
         dict_prod_long_short[prod_long] = prod_short
     return dict_prod_long_short
-dict_prod_long_short = get_dict_prod_long_short()
+
 
 def get_dict_imp_cat_fp():
     dict_imp_cat_fp = {}
@@ -1114,7 +972,7 @@ def get_dict_imp_cat_fp():
             fp = row[-1]
             dict_imp_cat_fp[imp_cat] = fp
     return dict_imp_cat_fp
-dict_imp_cat_fp = get_dict_imp_cat_fp()
+
 
 def get_dict_imp_cat_magnitude():
     dict_imp_cat_magnitude = {}
@@ -1125,21 +983,8 @@ def get_dict_imp_cat_magnitude():
             magnitude = int(row[-1])
             dict_imp_cat_magnitude[imp_cat] = magnitude
     return dict_imp_cat_magnitude
-dict_imp_cat_magnitude = get_dict_imp_cat_magnitude()
 
-#   Load EXIOBASE.
-if dict_eb_file_name in os.listdir(data_path):
-    dict_eb = pickle.load(open(data_path+dict_eb_file_name, 'rb'))
-else:
-    dict_eb = eb.process(eb.parse())
-    save_eb = True
-    if save_eb:
-        pickle.dump(dict_eb, open(data_path+dict_eb_file_name, 'wb'))
 
-#   Get characterisation factors.
-dict_cf = get_dict_cf()
-
-#   Generate dictionary with list of EU28 countries.
 def get_list_reg_fd(reg_fd):
     if reg_fd == 'EU28':
         with open(data_path+eu28_file_name) as read_file:
@@ -1153,40 +998,57 @@ def get_list_reg_fd(reg_fd):
 
 
 font_size = 8.0
-###############################################################################
-# Priority setting
-# Get dictionary with footprints.
-# final demand matrix of EU28
+date = get_date()
+
+#   Make result directories.
+method = '_source_shift/'
+result_dir_path = 'result/'+date+method
+priority_setting_dir_name = '1_priority_setting/'
+shift_dir_name = '2_shift/'
+reduc_dir_name = '3_reduction/'
+reduc_agg_dir_name = '4_reduction_agg/'
+pdf_dir_name = 'pdf/'
+png_dir_name = 'png/'
+
+data_path = 'data/'
+eu28_file_name = 'EU28.txt'
+e_fp_file_name = 'list_impact_emission.txt'
+m_fp_file_name = 'list_impact_material.txt'
+r_fp_file_name = 'list_impact_resource.txt'
+country_code_file_name = 'country_codes.txt'
+prod_long_file_name = 'prod_long.txt'
+prod_short_file_name = 'prod_short.txt'
+dict_eb_file_name = 'dict_eb_proc.pkl'
+cf_long_footprint_file_name = 'cf_long_footprint.txt'
+cf_magnitude_file_name = 'cf_magnitude.txt'
+prod_order_file_name = 'prod_order.txt'
+
+mpl.rcParams['mathtext.default'] = 'regular'
+mpl.rcParams.update({'font.size': 8.0})
+
+dict_imp_cat_magnitude = get_dict_imp_cat_magnitude()
+dict_imp_cat_fp = get_dict_imp_cat_fp()
+dict_prod_long_short = get_dict_prod_long_short()
+
+if dict_eb_file_name in os.listdir(data_path):
+    dict_eb = pickle.load(open(data_path+dict_eb_file_name, 'rb'))
+else:
+    dict_eb = eb.process(eb.parse())
+    save_eb = True
+    if save_eb:
+        pickle.dump(dict_eb, open(data_path+dict_eb_file_name, 'wb'))
+
+dict_cf = get_dict_cf()
 list_reg_fd = get_list_reg_fd('EU28')
 df_tY_eu28 = dict_eb['tY'][list_reg_fd].copy()
-# final demand vector of EU28
-#df_tY_eu28_full = df_tY_eu28.sum(axis=1)
 
 for cntr in list_reg_fd:
     df_tY_eu28.loc[cntr, cntr] = 0
 df_tY_eu28_fdsum = df_tY_eu28.sum(axis=1)
-#dict_df_imp_full = get_dict_df_imp(df_tY_eu28_full)
 dict_df_imp = get_dict_df_imp(df_tY_eu28_fdsum)
-
-
-
-dict_imp_cat_sum = {}
-for imp_cat in dict_df_imp:
-    dict_df_imp_cat_sum = dict_df_imp[imp_cat].sum(axis=1).to_dict()
-    for key in dict_df_imp_cat_sum.keys():
-        dict_imp_cat_sum[key] = dict_df_imp_cat_sum[key]
-#   Cast dataframes with absolute impact to dict.
 dict_imp = get_dict_imp(dict_df_imp)
 
-
-dict_imp_cat_unit = {}
-dict_imp_cat_unit['kg CO2 eq.'] = r'$Pg\/CO_2\/eq.$'
-dict_imp_cat_unit['kt'] = r'$Gt$'
-dict_imp_cat_unit['Mm3'] = r'$Mm^3$'
-dict_imp_cat_unit['km2'] = r'$Gm^2$'
-
-###############################################################################
-# Plot priority setting
+make_result_dir()
 set_priority()
 dict_y_new = shift_source()
 calc_improv()
