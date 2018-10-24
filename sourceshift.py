@@ -510,7 +510,6 @@ def make_result_dir():
 
 def shift_source():
     print('sourceshift')
-
     dict_cntr_short_long = {}
     with open(data_path+country_code_file_name, 'r') as read_file:
         csv_file = csv.reader(read_file, delimiter='\t')
@@ -521,42 +520,26 @@ def shift_source():
 
     x_prod_cntr_min = 0.5
 
-    df_cQe = dict_cf['e']
-    df_cQm = dict_cf['m']
-    df_cQr = dict_cf['r']
-    df_cRe = dict_eb['cRe']
-    df_cRm = dict_eb['cRm']
-    df_cRr = dict_eb['cRr']
-    df_cL = dict_eb['cL']
     dict_df_imp_pME = {}
-    dict_df_imp_pME['e'] = df_cQe.dot(df_cRe).dot(df_cL)
-    dict_df_imp_pME['m'] = df_cQm.dot(df_cRm).dot(df_cL)
-    dict_df_imp_pME['r'] = df_cQr.dot(df_cRr).dot(df_cL)
+    dict_df_imp_pME['e'] = dict_cf['e'].dot(dict_eb['cRe']).dot(dict_eb['cL'])
+    dict_df_imp_pME['m'] = dict_cf['m'].dot(dict_eb['cRm']).dot(dict_eb['cL'])
+    dict_df_imp_pME['r'] = dict_cf['r'].dot(dict_eb['cRr']).dot(dict_eb['cL'])
     dict_imp_pME = get_dict_imp(dict_df_imp_pME)
 
-    dict_imp_prod_sort_full = get_dict_imp_prod_sort(1.1)
     dict_imp_prod_cntr_sort = {}
-    for imp_cat in dict_imp_prod_sort_full:
+    for imp_cat in dict_imp:
         dict_imp_prod_cntr_sort[imp_cat] = OrderedDict()
-        dict_imp_pME_prod_cntr = {}
-        for prod in dict_imp_prod_sort_full[imp_cat]:
+        for prod in dict_imp[imp_cat]:
             dict_imp_prod_cntr_sort[imp_cat][prod] = OrderedDict()
-            dict_imp_prod_cntr = dict_imp[imp_cat][prod]
-            dict_imp_pME_prod_cntr[prod] = {}
-            for cntr in dict_imp_prod_cntr:
-                dict_imp_pME_prod_cntr[prod][cntr] = (
-                        dict_imp_pME[imp_cat][prod][cntr])
             list_imp_pME_prod_cntr_sort = sorted(
-                        dict_imp_pME_prod_cntr[prod].items(),
+                        dict_imp_pME[imp_cat][prod].items(),
                         key=operator.itemgetter(1))
             for tup_cntr_imp_pME in list_imp_pME_prod_cntr_sort:
                 cntr, imp_pME_prod_cntr = tup_cntr_imp_pME
                 dict_imp_prod_cntr_sort[imp_cat][prod][cntr] = (
-                        dict_imp_prod_cntr[cntr])
-
+                        dict_imp[imp_cat][prod][cntr])
 
     df_tY_eu28_cntr = df_tY_eu28.sum(axis=1, level=0)
-
     dict_tY_eu28_cntr = df_tY_eu28_cntr.to_dict()
     dict_tY_eu28_cntr_import = {}
     for cntr_fd in dict_tY_eu28_cntr:
@@ -572,21 +555,6 @@ def shift_source():
                 dict_tY_eu28_cntr_import[prod][cntr] += (
                         dict_tY_eu28_cntr[cntr_fd][tup_cntr_prod])
 
-    #   Get dictionary with total output of products with highest impact
-    #   for all countries.
-    df_tY_world = dict_eb['tY'].copy()
-    df_tY_world_fdsum = df_tY_world.sum(axis=1)
-    df_tX_world = dict_eb['cL'].dot(df_tY_world_fdsum)
-    dict_tX_world = df_tX_world.to_dict()
-    dict_tX_world_prod_cntr = {}
-    for tup_cntr_prod in dict_tX_world:
-        cntr, prod = tup_cntr_prod
-        if prod not in dict_tX_world_prod_cntr:
-            dict_tX_world_prod_cntr[prod] = {}
-        dict_tX_world_prod_cntr[prod][cntr] = dict_tX_world[tup_cntr_prod]
-
-    #   Get dictionary with total output of products with highest impact
-    #   for all countries.
     df_tY_world = dict_eb['tY'].copy()
     list_cntr = list(df_tY_world.columns.get_level_values(0))
     for cntr in list_cntr:
@@ -601,28 +569,20 @@ def shift_source():
         dict_tY_world_ex_prod_cntr[prod][cntr] = (
                 dict_tY_world_ex[tup_cntr_prod])
 
-    dict_lim = {}
-    dict_ax = {}
-    dict_imp_cat_prod_imp_abs = {}
     dict_imp_cat_prod_imp_abs_sum = {}
+    dict_imp_cat_prod_cntr_sort_trunc = {}
+
     for imp_cat in dict_imp_prod_cntr_sort:
-        dict_imp_cat_prod_imp_abs[imp_cat] = {}
         dict_imp_cat_prod_imp_abs_sum[imp_cat] = {}
+        dict_imp_cat_prod_cntr_sort_trunc[imp_cat] = {}
         for prod in dict_imp_prod_cntr_sort[imp_cat]:
-            dict_imp_cat_prod_imp_abs[imp_cat][prod] = {}
             imp_abs_sum = 0
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
                 imp_abs = dict_imp_prod_cntr_sort[imp_cat][prod][cntr]
-                dict_imp_cat_prod_imp_abs[imp_cat][prod][cntr] = imp_abs
                 imp_abs_sum += imp_abs
             dict_imp_cat_prod_imp_abs_sum[imp_cat][prod] = imp_abs_sum
-
-    dict_imp_cat_prod_cntr_sort_trunc = {}
-    for imp_cat in dict_imp_cat_prod_imp_abs:
-        dict_imp_cat_prod_cntr_sort_trunc[imp_cat] = {}
-        for prod in dict_imp_cat_prod_imp_abs[imp_cat]:
             list_imp_cat_prod_sort = sorted(
-                    dict_imp_cat_prod_imp_abs[imp_cat][prod].items(),
+                    dict_imp_prod_cntr_sort[imp_cat][prod].items(),
                     key=operator.itemgetter(1), reverse=True)
             list_imp_cat_prod_sort_trunc = []
             imp_abs_sum = dict_imp_cat_prod_imp_abs_sum[imp_cat][prod]
@@ -635,13 +595,14 @@ def shift_source():
                     imp_cum += imp_rel
                     if imp_cum <= 0.5:
                         list_imp_cat_prod_sort_trunc.append(cntr)
-
                     elif bool_add:
                         list_imp_cat_prod_sort_trunc.append(cntr)
                         bool_add = False
             dict_imp_cat_prod_cntr_sort_trunc[imp_cat][prod] = (
                     list_imp_cat_prod_sort_trunc)
 
+    dict_lim = {}
+    dict_ax = {}
     for imp_cat in dict_imp_prod_cntr_sort:
         dict_lim[imp_cat] = {}
         dict_ax[imp_cat] = {}
@@ -801,7 +762,6 @@ def shift_source():
             x_start = 0
             y_start = 0
             list_rect_y = []
-            list_rect_x = []
             ax = dict_ax[imp_cat][prod]
             y_prod = dict_tY_prod[prod]
             for cntr in dict_imp_prod_cntr_sort[imp_cat][prod]:
@@ -844,11 +804,7 @@ def shift_source():
                                                    imp_pME_prod_cntr)
                         y_prod -= y_prod
 
-                    rect_x = patches.Rectangle((x_start, y_start),
-                                               x_prod_cntr,
-                                               imp_pME_prod_cntr)
                     list_rect_y.append(rect_y)
-                    list_rect_x.append(rect_x)
                     x_start += x_prod_cntr
 
                     rect_y = patches.Rectangle((0, 0), 0, 0)
@@ -856,8 +812,6 @@ def shift_source():
 
             col_rect_y = mpl_col.PatchCollection(list_rect_y,
                                                  facecolor='green')
-            col_rect_x = mpl_col.PatchCollection(list_rect_x,
-                                                 facecolor='gray')
             col_rect_y.set_alpha(0.5)
             ax.add_collection(col_rect_y)
             ax.autoscale()
@@ -908,9 +862,7 @@ def calc_new_fp():
                         dict_y_new[imp_cat][prod][cntr])
 
     #   For each impact category make new final demand DataFrames
-    dict_df_tY_new = {}
     dict_imp_new_reg = {}
-
     for imp_cat_id, imp_cat_sel in enumerate(dict_df_tY_import_new):
         #    Fill import column
         df_tY_eu28 = dict_eb['tY'][list_reg_fd].copy()
@@ -920,14 +872,7 @@ def calc_new_fp():
         df_tY_eu28_import[list(dict_df_tY_import_new[imp_cat_sel].keys())] = (
                 list(dict_df_tY_import_new[imp_cat_sel].values()))
         df_tY_eu28_import.columns = ['import']
-#        dict_df_tY_new[imp_cat_sel] = df_tY_eu28_import
-#
-##    for imp_cat_sel in dict_df_tY_new:
-#        df_tY_new = dict_df_tY_new[imp_cat_sel]
-
-#        dict_df_imp_new = get_dict_df_imp(df_tY_new)
         dict_df_imp_new = get_dict_df_imp(df_tY_eu28_import)
-
         dict_imp_new = get_dict_imp(dict_df_imp_new)
         dict_imp_new_reg[imp_cat_sel] = {}
         for imp_cat_eff in dict_imp_new:
