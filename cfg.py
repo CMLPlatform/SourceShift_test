@@ -20,8 +20,11 @@ priority_setting_dir_name = '1_priority_setting/'
 shift_dir_name = '2_shift/'
 reduc_dir_name = '3_reduction/'
 reduc_agg_dir_name = '4_reduction_agg/'
+
 pdf_dir_name = 'pdf/'
 png_dir_name = 'png/'
+txt_dir_name = 'txt/'
+list_output_dir_name = [pdf_dir_name, png_dir_name, txt_dir_name]
 
 data_path = 'data/'
 eu28_file_name = 'EU28.txt'
