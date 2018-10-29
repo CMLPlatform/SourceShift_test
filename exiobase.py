@@ -4,11 +4,11 @@ Created on Tue Jan  9 15:18:58 2018
 
 @author: boerbfde
 """
-#import csv
 import numpy as np
 import os
 import pandas as pd
-#import pickle
+
+import cfg
 
 def get_dict_eb_parse_meta():
     dict_eb_parse_meta = {}
@@ -33,27 +33,28 @@ def get_dict_eb_parse_meta():
     dict_eb_parse_meta['table']['tHr']['file_name_pattern'] = 'mrFDResource'
     dict_eb_parse_meta['table']['tW']['file_name_pattern'] = 'mrFactorInput'
 
-    dict_eb_parse_meta['table']['tZ']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tY']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tRe']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tRm']['index_col'] = [0,1]
-    dict_eb_parse_meta['table']['tRr']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tHe']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tHm']['index_col'] = [0,1]
-    dict_eb_parse_meta['table']['tHr']['index_col'] = [0,1,2]
-    dict_eb_parse_meta['table']['tW']['index_col'] = [0,1]
+    dict_eb_parse_meta['table']['tZ']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tY']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tRe']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tRm']['index_col'] = [0, 1]
+    dict_eb_parse_meta['table']['tRr']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tHe']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tHm']['index_col'] = [0, 1]
+    dict_eb_parse_meta['table']['tHr']['index_col'] = [0, 1, 2]
+    dict_eb_parse_meta['table']['tW']['index_col'] = [0, 1]
 
-    dict_eb_parse_meta['table']['tZ']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tY']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tRe']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tRm']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tRr']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tHe']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tHm']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tHr']['header'] = [0,1]
-    dict_eb_parse_meta['table']['tW']['header'] = [0,1]
+    dict_eb_parse_meta['table']['tZ']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tY']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tRe']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tRm']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tRr']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tHe']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tHm']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tHr']['header'] = [0, 1]
+    dict_eb_parse_meta['table']['tW']['header'] = [0, 1]
 
     return dict_eb_parse_meta
+
 
 def fill_unit(df_source, df_target):
     '''
@@ -73,36 +74,49 @@ def fill_unit(df_source, df_target):
     df_target.index = list_df_target_index_values_new
     return df_target
 
-def parse(eb_path = 'data/mrIOT_pxp_ita_transactions_3.3_2011/', cQ_dir = 'data/'):
+
+def parse():
     print('Begin parsing EXIOBASE')
     dict_eb_parse_meta = get_dict_eb_parse_meta()
     dict_eb_raw = {}
 
-    ###############################################################################
-    ####load raw exiobase
+    # Get file names of exiobase.
+    list_eb_file_name = os.listdir(cfg.eb_path)
 
-    #get file names of exiobase
-    list_eb_file_name = os.listdir(eb_path)
-
-    #pattern match file names to fill dictionary with raw exiobase data
+    # Pattern match file names to fill dictionary with raw exiobase data.
     for eb_file_name in list_eb_file_name:
         for table in dict_eb_parse_meta['table']:
-            if dict_eb_parse_meta['table'][table]['file_name_pattern'] in eb_file_name:
-                eb_file_path = eb_path+eb_file_name
-                dict_eb_raw[table] = pd.read_csv(eb_file_path, sep = '\t', header = dict_eb_parse_meta['table'][table]['header'], index_col =  dict_eb_parse_meta['table'][table]['index_col'], low_memory = False)
+            if dict_eb_parse_meta['table'][table]['file_name_pattern'] in (
+                    eb_file_name):
+                eb_file_path = cfg.eb_path+eb_file_name
+                dict_eb_raw[table] = pd.read_csv(
+                        eb_file_path,
+                        sep='\t',
+                        header=dict_eb_parse_meta['table'][table]['header'],
+                        index_col=dict_eb_parse_meta['table'][table]['index_col'],
+                        low_memory=False)
 
-    #define file paths for characteristion factors
-    cQe_file_name = 'Q_emission.txt'
-    cQm_file_name = 'Q_material.txt'
-    cQr_file_name = 'Q_resource.txt'
-    cQe_file_path = cQ_dir+cQe_file_name
-    cQm_file_path = cQ_dir+cQm_file_name
-    cQr_file_path = cQ_dir+cQr_file_name
+    # Define file paths for characteristion factors.
+    cQe_file_path = cfg.data_path+cfg.cQe_file_name
+    cQm_file_path = cfg.data_path+cfg.cQm_file_name
+    cQr_file_path = cfg.data_path+cfg.cQr_file_name
 
-    #read characterisation factors into pandas
-    df_cQe = pd.read_csv(cQe_file_path, sep = '\t', header = [0,1,2], index_col = [0,1,2,3], low_memory = False)
-    df_cQm = pd.read_csv(cQm_file_path, sep = '\t', header = [0,1], index_col = [0,1], low_memory = False)
-    df_cQr = pd.read_csv(cQr_file_path, sep = '\t', header = [0,1,2], index_col = [0,1], low_memory = False)
+    # Read characterisation factors into pandas.
+    df_cQe = pd.read_csv(cQe_file_path,
+                         sep='\t',
+                         header=[0, 1, 2],
+                         index_col=[0, 1, 2, 3],
+                         low_memory=False)
+    df_cQm = pd.read_csv(cQm_file_path,
+                         sep='\t',
+                         header=[0, 1],
+                         index_col=[0, 1],
+                         low_memory=False)
+    df_cQr = pd.read_csv(cQr_file_path,
+                         sep='\t',
+                         header=[0, 1, 2],
+                         index_col=[0, 1],
+                         low_memory=False)
     dict_eb_raw['cQe'] = df_cQe
     dict_eb_raw['cQm'] = df_cQm
     dict_eb_raw['cQr'] = df_cQr
@@ -110,26 +124,31 @@ def parse(eb_path = 'data/mrIOT_pxp_ita_transactions_3.3_2011/', cQ_dir = 'data/
     print('Done parsing EXIOBASE')
     return dict_eb_raw
 
+
 def process(dict_eb_raw):
     print('Begin processing EXIOBASE')
     dict_eb_proc = {}
 
-    #Construct Total Production Vector x from sum of Z and Y
-    df_tx = dict_eb_raw['tZ'].sum(axis = 1) + dict_eb_raw['tY'].sum(axis = 1)
+    # Construct Total Production Vector x from sum of Z and Y.
+    df_tx = dict_eb_raw['tZ'].sum(axis=1) + dict_eb_raw['tY'].sum(axis=1)
 
-    #Construct 1/x array for future calculations
+    # Construct 1/x array for future calculations.
     array_tx = df_tx.values
     array_tx[array_tx == 0] = np.nan
     array_tx_inv = (1/array_tx)
-    array_tx_inv[np.isnan(array_tx_inv)] = 0 #replace nan with zero, due to div by zero
 
-    #Construct Technical Coefficient Matrix
+    # Replace nan with zero, due to div by zero.
+    array_tx_inv[np.isnan(array_tx_inv)] = 0
+
+    # Construct Technical Coefficient Matrix.
     df_cA = dict_eb_raw['tZ']*array_tx_inv
 
-    #Construct Leontief Inverse
+    # Construct Leontief Inverse.
     array_cI = np.eye(df_cA.shape[0])
     array_cL = np.linalg.inv(array_cI-df_cA)
-    df_cL = pd.DataFrame(array_cL, index = df_cA.index, columns = df_cA.columns)
+    df_cL = pd.DataFrame(array_cL,
+                         index=df_cA.index,
+                         columns=df_cA.columns)
     df_cL.index = df_cL.index.droplevel(2)
     df_cRe = dict_eb_raw['tRe']*array_tx_inv
     df_cRm = fill_unit(dict_eb_raw['cQe'], df_cRe)
@@ -156,18 +175,13 @@ def process(dict_eb_raw):
     return dict_eb_proc
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
-#    dict_eb_raw = parse()
     dict_eb_proc = process(parse())
 
-##    pickle.dump(dict_eb_raw, open('dict_eb_raw.pkl', 'wb'))
-#    dict_eb_raw_new = pickle.load(open('data/dict_eb_raw.pkl', 'rb'))
-#
-#    dict_eb_proc = process(dict_eb_raw_new)
-#    pickle.dump(dict_eb_proc, open('data/dict_eb_proc.pkl', 'wb'))
-#    dict_eb_proc_new = pickle.load(open('data/dict_eb_proc.pkl', 'rb'))
-#
-    df_cQRLe = dict_eb_proc['cQe'].dot(dict_eb_proc['cRe']).dot(dict_eb_proc['cL'])
-    df_cQRLm = dict_eb_proc['cQm'].dot(dict_eb_proc['cRm']).dot(dict_eb_proc['cL'])
-    df_cQRLr = dict_eb_proc['cQr'].dot(dict_eb_proc['cRr']).dot(dict_eb_proc['cL'])
+    df_cQRLe = dict_eb_proc['cQe'].dot(dict_eb_proc['cRe']).dot(
+            dict_eb_proc['cL'])
+    df_cQRLm = dict_eb_proc['cQm'].dot(dict_eb_proc['cRm']).dot(
+            dict_eb_proc['cL'])
+    df_cQRLr = dict_eb_proc['cQr'].dot(dict_eb_proc['cRr']).dot(
+            dict_eb_proc['cL'])
